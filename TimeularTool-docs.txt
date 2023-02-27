@@ -1,0 +1,154 @@
+Timeular tool
+
+
+
+Table example:
+
+Thursday 2022-08-04 - 3h 40m
+#1   AA   14:30   3h 25m   FM64-9876   Task name         Description of a task
+#2   AA   17:30   15m      DEV-75      General           Doing some weirdness
+
+Friday 2022-08-05 - 7h 50m
+#3   AA   09:10   20m      DEV-75      Meeting           StandUp
+#4   AA   10:00   1h 30m   FM64-9876   Some funky task   Starting to do some actual work
+#5   AA   12:30   6h       FM64-1234   ANother task      Switching to another funky task
+
+Total: 11h 30m
+
+
+
+Commands:
+Syntax                  Example         Description                                         Entry changes
+‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾      ‾‾‾‾‾‾‾‾‾‾‾‾‾‾  ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾  ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+[Enter]                 ↵               Display table of entries with latest time period
+show                    show            Display table of latest entries or all loaded entries if nothing was displayed before
+show all                show all        Display table of all loaded entries
+show [Date]             show today      Display table of entries for the specified date
+show [Week]             show last week  Display table of entries for the specified week
+show [Date]..[Date]     show 10..12     Display table of entries for the specified interval of days
+show [Node]             show AR         Display table of entries for the day in which specified entry is located
+[Get] [Date]            fetch today     Load entries for specified day
+[Get] [Week]            load week       Load entries for this week
+[Get] [Date]..[Date]    get mon .. wed  Load entries for specified interval of days
+del [Date]              del sat         Delete all entries in specified day
+del [Date]..[Date]      del sat .. sun  Delete all entries for the specified interval of days
+del personal            del personal    Delete all entries with activities that does not have associated Jira ID
+del [Task]              del [Meeting]   Delete all entries with specified activity name
+combine                 combine         Fuse entries with the same description within the same day
+[Node] = [Span]         XV = 2h 45m     Set entry duration to specified time interval       span = time
+[Node] + [Span]         LM + 15m        Increase entry duration                             span += time
+[Node] - [Span]         YO - 1h 5m      Decrease entry duration                             span -= time
+[Node] > [Span]         QI > 1h         Contract entry duration from beginning              start += time, span -= time
+[Node] < [Span]         WN < 10m        Expand entry duration from beginning                start -= time, span += time
+[Node] >> [Span]        LB >> 1d        Shift entry to specified amount of time ahead       start += time
+[Node] << [Span]        PE << 30m       Shift entry to specified amount of time behind      start -= time
+[Node] = [Time]         RG = 15:30      Set entry start time to specified time interval     start = time
+- [Node]                - UF            Delete specified entry                              <deleted>
+[Node] >> [Node]        FT >> TC        Fuse Node 1 into Node 2, take description from 2nd  description=2, start=min, duration=sum, 1 = <deleted>
+[Node] << [Node]        RT << UV        Fuse Node 2 into Node 1, take description from 1st  description=1, start=min, duration=sum, 2 = <deleted>
+[Node] -> [Node]        GS -> AT        Copy Node 1 description to Node 2                   2.description = 1.description
+[Node] | [Span] : ...   NG | 2h : Desc  Detach new entry from the end of specified entry with given duration and description
+[Node] [Task]           HB [General]    Set activity with specified name for entry          activity = <name>
+[Node] : ...            AP : Desc       Edit description of specified entry                 description = ...
+clear [Date]..[Date]    clear           Clear entries cache for specified time interval
+fix spaces              fix spaces      Replace all consecutive whitespace in entry description with a single space character
+
+
+
+Tokens:
+[Node] – Symbolic name (i.e. `AB`) of the entry that the operation will be applied to
+[Span] – Time interval in the format `Xh Ym` (for ex. `5h3m`, `45m`)
+[Time] – Time in format `HH:MM`
+[Date] – Day in one of the following formats:
+         • `2022-11-06` – absolute format
+         • `04` – date of specified day of the current month
+         • `today` – date of the current day
+         • `yesterday` – date of the previous day
+         • `mon|tue|wed|thu|fri|sat|sun` – date corresponding to specified day of the week
+         • `last mon|tue|wed|thu|fri|sat|sun` – date corresponding to specified day of the previous week
+[Week] – Week in one of the formats:
+         • `week` – monday to sunday of the current week
+         • `last week` – monday to sunday of the previous week
+         • `week-N` – monday to sunday of the Nth past week
+[Get]  – Either of three commands: get|load|fetch
+         • `get` – fetch activities and specified entries from server first time, re-load them from cache on subsequent calls
+         • `load` – load activities and specified entries from cache, raise error on cache miss
+         • `fetch` – download activities and specified entries from the server and update cache
+
+
+
+Architecture:
+Layer 1: API
+    Gist: get time tracking data from backend server (Timeular, Timecamp, etc.)
+    Input: backend credentials
+    Output: python Json-like dicts with raw data from server
+    API:
+        • login(key: str, secret: str) -> None
+        • logout() -> None
+        • get_entries(start: date, end: date) -> List[BackendEntry]
+        • get_tasks() -> List[BackendTask]
+    Interface: `Backend`
+    Classes: `Timeular`, `Timecamp`
+
+Layer 2: Data
+    Gist: convert raw server data to `Entry` and `Task` objects
+    Input: backend-specific Json-like dicts containing raw data from backend server
+    Output: Generalized `TEntry` and `TTask` objects + `.json` cache files
+    API:
+        • TBA
+        • TBA
+        • TBA
+    Interface: `Manager`, `TEntry`, `TTask`
+    Classes: `TimeularManager`, `TimecampManager`, `CacheManager`
+
+Layer 3: Entities
+    Classes: `Entry`, `Task`
+
+Layer 4: Commands
+    Classes: `Token`, `Command`
+
+Layer 5: Application
+
+Out-Layer: Export
+    Classes: `Table`, `Jira`
+
+Utils:
+    Entities: `CONFIG`, `Tools`
+
+
+
+ToDo:
+[x] Make spaces between command token and command syntax literal optional
+[x] Add `Nd` format to `Span` token (does not combine with `Xh` and `Xm`, just for moving between days)
+[x] Only 1 space between Jira ID and Activity name
+[x] Command to replace all whitespace in entries description with a single space >> 'fix spaces'
+[x] Handle multi-line entry descriptions >> replace newlines with '|'
+[x] Add `Num` Token
+[x] Add command to delete entries with specified activities
+[x] Add 'auto_display' `CONFIG` option to display latest table automatically after every non-'show' command
+[x] Move `jira_task_regex`: `CONFIG` —> `Activity`
+[x] Add docstrings from "Commands" table above to command handlers in `command.py`
+[x] Add `combine [Date]`, `combine [Week]` and `combine [Date]..[Date]` commands
+[-] When parsing using tokens, add '\b' to the start and end of every regex string
+[-] Add support for plain regexes in `Command` pattern (like r'/.*/' for arbitrary text and so on)
+[ ] Commands `show next` and `show prev` (days)
+[ ] Think about joining `[Week]` and `[Date]..[Date]` into a single Token`
+[ ] Save working entry list to a separate cache and load back (`.save()` and `.restore()` functions)
+[ ] On unhandled error, save entries to working cache
+[ ] Implement all "Not implemented" commands
+[ ] Command `+ [Node]` for mistakenly removed nodes
+[ ] Use logging module for debug prints
+[ ] Extract all fetching and caching functionality from `entry.py` to `entry-loader.py`
+[ ] Convert `config.py` to TOML, YAML or custom format
+[ ] Output time intervals for RND for Igoris to quickly correct:
+    • Start of work – start of lunch break
+    • End of lunch break – end of work
+[ ] Convert common MD-style formatting to Jira-style formatting
+    • `code` to {{_code_}}
+    • etc.
+[ ] Check the first work in time entry description not ending with 'ing'
+    If it does, suggest to auto-remove it or rewrite the whole first word using imperative form
+[ ] Remove `CONFIG` dependencies from all files except for 'app.py'
+[ ] Make sure that all the deps come only top-to-bottom (i.e. that no lower-level module imports 'app.py')
+[ ] Reorganize the app to handle backend dep in the most organized way possible
+[ ] Rename `get_activities` to `get_tasks` and `Activities` to `Tasks`

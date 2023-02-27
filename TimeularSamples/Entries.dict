@@ -1,0 +1,138 @@
+Entries
+
+{
+    'id': '59705930',
+    'activityId': '1225813',
+    'duration': {'startedAt': '2022-05-27T09:14:45.564', 'stoppedAt': '2022-05-27T09:42:00.000'},
+    'note': {
+        'text': None,
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59713429',
+    'activityId': '1006908',
+    'duration': {'startedAt': '2022-05-27T12:30:00.000', 'stoppedAt': '2022-05-27T12:50:00.000'},
+    'note': {
+        'text': 'Deal with hacking of my messenger account',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59701200',
+    'activityId': '1225810',
+    'duration': {'startedAt': '2022-05-27T07:00:00.000', 'stoppedAt': '2022-05-27T07:15:00.000'},
+    'note': {
+        'text': 'Email management',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59708603',
+    'activityId': '1225810',
+    'duration': {'startedAt': '2022-05-27T10:15:00.000', 'stoppedAt': '2022-05-27T10:38:00.000'},
+    'note': {
+        'text': 'Email management',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59699027',
+    'activityId': '1225816',
+    'duration': {'startedAt': '2022-05-27T06:10:16.850', 'stoppedAt': '2022-05-27T06:26:23.047'},
+    'note': {
+        'text': '<{{|t|4032452|}}>',
+        'tags': [
+            {'id': 4032452, 'key': 'a57ed3e0-06b4-4dfe-8cab-c7598d565d3d', 'label': 'StandUp', 'scope': 'timeular', 'spaceId': '105685'},
+        ],
+        'mentions': [],
+    },
+},
+{
+    'id': '59706926',
+    'activityId': '1225816',
+    'duration': {'startedAt': '2022-05-27T08:00:00.000', 'stoppedAt': '2022-05-27T09:10:00.000'},
+    'note': {
+        'text': '<{{|t|2693042|}}> 71',
+        'tags': [
+            {'id': 2693042, 'key': '04784a6c-47c4-4719-8b68-1e107365f3fe', 'label': 'SprintEstimation', 'scope': 'timeular', 'spaceId': '105685'},
+        ],
+        'mentions': [],
+    },
+},
+{
+    'id': '59700069',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T06:26:41.999', 'stoppedAt': '2022-05-27T07:00:00.000'},
+    'note': {
+        'text': 'Analyzing logs',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59706999',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T07:15:00.000', 'stoppedAt': '2022-05-27T07:30:00.000'},
+    'note': {
+        'text': 'Prepare for GNSS jumps meeting',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59707028',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T07:30:00.000', 'stoppedAt': '2022-05-27T08:00:00.000'},
+    'note': {
+        'text': 'Roseman GNSS jumps issue fillow-up meeting',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59707337',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T09:42:00.000', 'stoppedAt': '2022-05-27T10:15:00.000'},
+    'note': {
+        'text': 'Fixing Python script for plotting track from huge logs',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59713361',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T10:38:49.231', 'stoppedAt': '2022-05-27T11:30:00.000'},
+    'note': {
+        'text': 'Fixing Python script for plotting track from huge logs',
+        'tags': [],
+        'mentions': []
+    },
+},
+{
+    'id': '59713405',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T11:30:00.000', 'stoppedAt': '2022-05-27T12:30:00.000'},
+    'note': {
+        'text': 'Discuss further steps with <{{|m|205973|}}> and create summary for Roman',
+        'tags': [],
+        'mentions': [
+            {'id': 205973, 'key': 'b02a85b9-1cc3-48d6-9fed-18b40fdcc5fe', 'label': 'Igoris', 'scope': 'timeular', 'spaceId': '105685'}
+        ]
+    },
+},
+{
+    'id': '59717557',
+    'activityId': '1431794',
+    'duration': {'startedAt': '2022-05-27T14:14:32.077', 'stoppedAt': '2022-05-27T15:50:39.398'},
+    'note': {
+        'text': 'Analyzing logs',
+        'tags': [],
+        'mentions': []
+    },
+},

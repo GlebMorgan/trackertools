@@ -1,0 +1,26 @@
+Spaces
+
+{
+    'id': '105685',
+    'name': 'Teltonika',
+    'default': True,
+    'members': [{
+        'id': '110127',
+        'name': 'Gleb Morgan',
+        'email': 'glebmorgan@gmail.com',
+        'role': 'Admin'
+    }],
+    'retiredMembers': []
+},
+{
+    'id': '140221',
+    'name': 'FMx64',
+    'default': False,
+    'members': [{
+        'id': '110127',
+        'name': 'Gleb Morgan',
+        'email': 'glebmorgan@gmail.com',
+        'role': 'Admin'
+    }],
+    'retiredMembers': []
+}

@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.minimap.scale": 2,
+		"editor.minimap.enabled": true,
+		"editor.rulers": [120],
+		"editor.unicodeHighlight.ambiguousCharacters": false,
+		"python.analysis.logLevel": "Warning",
+		"python.analysis.typeCheckingMode": "strict",
+		"editor.guides.highlightActiveIndentation": "always",
+		"editor.bracketPairColorization.enabled": false,
+		"files.autoSave": "onFocusChange"
+	}
+}
