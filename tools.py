@@ -1,3 +1,5 @@
+import sys
+
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Tuple
@@ -7,9 +9,8 @@ from decorator import decorator
 
 TODAY = date.today()
 
-
-Json = Dict[str, Any]
 Config = Dict[str, int | str | bool | Path | dict[str, 'Config'] | None]
+Method = Callable[..., Any]
 
 
 class Format:
@@ -43,6 +44,7 @@ class AppError(RuntimeError):
 class CacheError(AppError):
     pass
 
+
 class ParseError(AppError):
     pass
 
@@ -52,7 +54,7 @@ def noop(*args: Any, **kwargs: Any):
 
 
 @decorator
-def deprecated(func: Callable[..., Any], *args: Any, **kwargs: Any):
+def deprecated(func: Method, *args: Any, **kwargs: Any):
     print(f"WARNING: function '{func.__name__}' is deprecated")
     return func(*args, **kwargs)
 
@@ -69,14 +71,14 @@ def unwrap(s: str) -> str:
 
 
 def round_time(dt: datetime, to: int = 5) -> datetime:
-   """Round a datetime object to any interval in min"""
-   rounding = to * 60
-   seconds = (dt.replace(tzinfo=None) - dt.min).seconds
-   rounded = (seconds + rounding / 2) // rounding * rounding
-   return dt + timedelta(0, rounded - seconds, -dt.microsecond)
+    """Round a datetime object to any interval in min"""
+    rounding = to * 60
+    seconds = (dt.replace(tzinfo=None) - dt.min).seconds
+    rounded = (seconds + rounding / 2) // rounding * rounding
+    return dt + timedelta(0, rounded - seconds, -dt.microsecond)
 
 
-def round_time_bounds(start: datetime, end: datetime, to: int = 5) -> Tuple[datetime, datetime]:
+def round_bounds(start: datetime, end: datetime, to: int = 5) -> Tuple[datetime, datetime]:
     rounding = to * 60
 
     start_seconds = (start.replace(tzinfo=None) - datetime.min).seconds
@@ -92,8 +94,10 @@ def round_time_bounds(start: datetime, end: datetime, to: int = 5) -> Tuple[date
     else:
         start_rounded = ((start_seconds - end_shift) + rounding // 2) // rounding * rounding
 
-    return (start + timedelta(0, start_rounded - start_seconds, -start.microsecond),
-            end + timedelta(0, end_rounded - end_seconds, -end.microsecond))
+    return (
+        start + timedelta(0, start_rounded - start_seconds, -start.microsecond),
+        end + timedelta(0, end_rounded - end_seconds, -end.microsecond),
+    )
 
 
 def timespan_to_duration(timespan: timedelta) -> str:
@@ -106,27 +110,67 @@ def timespan_to_duration(timespan: timedelta) -> str:
 
 
 def date_range(start: date, end: date) -> Iterable[date]:
-    return (start + timedelta(days=x) for x in range((end-start).days + 1))
+    return (start + timedelta(days=x) for x in range((end - start).days + 1))
 
 
 if __name__ == '__main__':
-    round_time_tests = [
-        (datetime(2022, 12, 31, 9, 10, 0),  datetime(2022, 12, 31, 9, 50, 0),   datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 50, 0)),
-        (datetime(2022, 12, 31, 9, 7, 30),  datetime(2022, 12, 31, 9, 27, 30),  datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 30, 0)),
-        (datetime(2022, 12, 31, 9, 30, 2),  datetime(2022, 12, 31, 9, 30, 2),   datetime(2022, 12, 31, 9, 30, 0), datetime(2022, 12, 31, 9, 30, 0)),
-        (datetime(2022, 12, 31, 9, 1, 42),  datetime(2022, 12, 31, 9, 22, 1),   datetime(2022, 12, 31, 9, 0, 0),  datetime(2022, 12, 31, 9, 20, 0)),
-        (datetime(2022, 12, 31, 9, 1, 42),  datetime(2022, 12, 31, 9, 22, 55),  datetime(2022, 12, 31, 9, 0, 0),  datetime(2022, 12, 31, 9, 20, 0)),
-        (datetime(2022, 12, 31, 9, 4, 42),  datetime(2022, 12, 31, 9, 17, 45),  datetime(2022, 12, 31, 9, 5, 0),  datetime(2022, 12, 31, 9, 20, 0)),
-        (datetime(2022, 12, 31, 9, 4, 42),  datetime(2022, 12, 31, 9, 17, 25),  datetime(2022, 12, 31, 9, 5, 0),  datetime(2022, 12, 31, 9, 20, 0)),
-        (datetime(2022, 12, 31, 9, 9, 30),  datetime(2022, 12, 31, 9, 30, 45),  datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 30, 0)),
-        (datetime(2022, 12, 31, 9, 12, 40), datetime(2022, 12, 31, 9, 30, 45),  datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 30, 0)),
-        (datetime(2022, 12, 31, 9, 10, 40), datetime(2022, 12, 31, 9, 44, 45),  datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 45, 0)),
-        (datetime(2022, 12, 31, 9, 7, 25),  datetime(2022, 12, 31, 9, 44, 45),  datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 45, 0)),
-    ]
+    match sys.argv[1:]:
+        case ['round-bounds']:
+            # fmt: off
+            round_time_tests = [
+                (
+                    datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 50, 0),
+                    datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 50, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 7, 30), datetime(2022, 12, 31, 9, 27, 30),
+                    datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 30, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 30, 2), datetime(2022, 12, 31, 9, 30, 2),
+                    datetime(2022, 12, 31, 9, 30, 0), datetime(2022, 12, 31, 9, 30, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 1, 42), datetime(2022, 12, 31, 9, 22, 1),
+                    datetime(2022, 12, 31, 9, 0, 0),  datetime(2022, 12, 31, 9, 20, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 1, 42), datetime(2022, 12, 31, 9, 22, 55),
+                    datetime(2022, 12, 31, 9, 0, 0),  datetime(2022, 12, 31, 9, 20, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 4, 42), datetime(2022, 12, 31, 9, 17, 45),
+                    datetime(2022, 12, 31, 9, 5, 0),  datetime(2022, 12, 31, 9, 20, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 4, 42), datetime(2022, 12, 31, 9, 17, 25),
+                    datetime(2022, 12, 31, 9, 5, 0),  datetime(2022, 12, 31, 9, 20, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 9, 30), datetime(2022, 12, 31, 9, 30, 45),
+                    datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 30, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 12, 40), datetime(2022, 12, 31, 9, 30, 45),
+                    datetime(2022, 12, 31, 9, 10, 0),  datetime(2022, 12, 31, 9, 30, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 10, 40), datetime(2022, 12, 31, 9, 44, 45),
+                    datetime(2022, 12, 31, 9, 10, 0),  datetime(2022, 12, 31, 9, 45, 0)
+                ),
+                (
+                    datetime(2022, 12, 31, 9, 7, 25), datetime(2022, 12, 31, 9, 44, 45),
+                    datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 45, 0)
+                ),
+            ]
 
-    for start, end, start_control, end_control in round_time_tests:
-        start_rounded, end_rounded = round_time_bounds(start, end)
-        assert start_rounded == start_control, f"{start = }, {start_control = }, {start_rounded = }"
-        assert end_rounded == end_control, f"{end = }, {end_control = }, {end_rounded = }"
+            for start, end, start_ref, end_ref in round_time_tests:
+                start_round, end_round = round_bounds(start, end)
+                assert start_round == start_ref, f"{start=}, {start_ref=}, {start_round=}"
+                assert end_round == end_ref, f"{end = }, {end_ref = }, {end_round = }"
 
-    print("'round_time_bounds()' tests passed")
+            print("'round_bounds()' tests passed")
+            # fmt: on
+
+        case other:
+            pass

@@ -82,23 +82,37 @@ Layer 1: API
     Gist: get time tracking data from backend server (Timeular, Timecamp, etc.)
     Input: backend credentials
     Output: python Json-like dicts with raw data from server
-    API:
-        • login(key: str, secret: str) -> None
-        • logout() -> None
-        • get_entries(start: date, end: date) -> List[BackendEntry]
-        • get_tasks() -> List[BackendTask]
-    Interface: `Backend`
+    Interfaces:
+    • `Backend`
+        • login(credentials: Dict[str, str])
+        • logout()
+        • get_tasks() -> Json
+        • get_entries(start: date, end: date) -> Json
     Classes: `Timeular`, `Timecamp`
 
 Layer 2: Data
-    Gist: convert raw server data to `Entry` and `Task` objects
+    Gist: convert raw server data to `TEntry` and `TTask` objects
     Input: backend-specific Json-like dicts containing raw data from backend server
     Output: Generalized `TEntry` and `TTask` objects + `.json` cache files
     API:
         • TBA
         • TBA
         • TBA
-    Interface: `Manager`, `TEntry`, `TTask`
+    Interfaces:
+    • `Manager`
+        ...
+    • `TEntry`:
+        id: int
+        task-id: int
+        start: datetime
+        end: datetime
+        description: str
+    • `TTask`
+        id: int
+        parent-id: int
+        name: str
+        jira: str
+        spec: str
     Classes: `TimeularManager`, `TimecampManager`, `CacheManager`
 
 Layer 3: Entities
@@ -152,3 +166,4 @@ ToDo:
 [ ] Make sure that all the deps come only top-to-bottom (i.e. that no lower-level module imports 'app.py')
 [ ] Reorganize the app to handle backend dep in the most organized way possible
 [ ] Rename `get_activities` to `get_tasks` and `Activities` to `Tasks`
+[ ] Put config to `.toml` file and use new Python module to parse it and wrap with `ConfigDict`

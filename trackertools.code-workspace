@@ -6,13 +6,58 @@
 	],
 	"settings": {
 		"editor.minimap.scale": 2,
-		"editor.minimap.enabled": true,
-		"editor.rulers": [120],
+		"editor.minimap.enabled": false,
+		"editor.rulers": [92],
 		"editor.unicodeHighlight.ambiguousCharacters": false,
-		"python.analysis.logLevel": "Warning",
+		// "python.analysis.logLevel": "Warning",
 		"python.analysis.typeCheckingMode": "strict",
+		"python.analysis.diagnosticSeverityOverrides": {
+			"reportUnnecessaryTypeIgnoreComment": "information",
+			"reportUnusedVariable": "none",
+			"reportUnusedImport": "warning",
+			"reportUnnecessaryComparison": "warning",
+			"reportPrivateUsage": "information",
+		},
 		"editor.guides.highlightActiveIndentation": "always",
 		"editor.bracketPairColorization.enabled": false,
-		"files.autoSave": "onFocusChange"
-	}
+		"files.autoSave": "onFocusChange",
+		/// "python.linting.pylintEnabled": true,
+		/// "python.linting.pylintArgs": [
+		/// 	"--disable", "C0114",
+		/// 	"--disable", "C0115",
+		/// 	"--disable", "C0116",
+		/// 	"--disable", "W0613",
+		/// ],
+		"python.formatting.provider": "black",
+		"python.formatting.autopep8Args": [
+			"--max-line-length", "92",
+			"--experimental"
+		],
+		// Black style: https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html
+		"python.formatting.blackArgs": [
+			"--line-length", "92",
+			"--skip-string-normalization",
+		],
+		// YAPF config = https://github.com/google/yapf#knobs
+		"python.formatting.yapfArgs": [
+			"--style", "{based_on_style: yapf, indent_width: 4, column_limit: 92, blank_lines_between_top_level_imports_and_variables: 2}"
+		],
+		// iSort config = https://pycqa.github.io/isort/docs/configuration/options.html
+		"isort.args": [
+			"--python-version", "auto",
+			"--line-length", "92",
+			"--multi-line", "9",
+			"--lines-after-imports", "2",
+			"--lines-between-types", "1",
+			"--star-first",
+			"--balanced",
+			"--atomic",
+		],
+		"[python]": {
+			"editor.formatOnSave": true,
+			"editor.codeActionsOnSave": {
+				"source.organizeImports": true,
+			},
+		},
+	},
 }

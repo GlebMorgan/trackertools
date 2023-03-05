@@ -1,14 +1,9 @@
-import sys
-
 from pathlib import Path
-
-from tools import ConfigDict, noop
+from tools import ConfigDict
 
 
 PROJECT_PATH = Path(__file__).parent
 
-
-# fmt: off
 
 CONFIG = ConfigDict(
     debug = True,
@@ -20,14 +15,14 @@ CONFIG = ConfigDict(
 
     backend = 'timeular',
 
-    api = dict(
-        timeular = dict(
-            key = "MTEwMTI3XzJiMzRiMzM4MDRmNzRiOTk5ODdiNWZmNjEzOTJiY2Q1",
-            secret = "MDhjZDNkNTY5NjI2NGQyOTg5ZTY1YjcwMDEwNzdhMzk=",
-        ),
-        timecamp = dict(
-            key = "68f5ea0d315e3cc33dac916fa7",
-        ),
+    timeular = dict(
+        key = "MTEwMTI3XzJiMzRiMzM4MDRmNzRiOTk5ODdiNWZmNjEzOTJiY2Q1",
+        secret = "MDhjZDNkNTY5NjI2NGQyOTg5ZTY1YjcwMDEwNzdhMzk=",
+    ),
+
+    timecamp = dict(
+        key = "68f5ea0d315e3cc33dac916fa7",
+        secret = "",
     ),
 
     general_tasks = dict(
@@ -39,7 +34,7 @@ CONFIG = ConfigDict(
         Relocation = 'DEV3-75',
     ),
 
-    specs = dict (
+    client_names = dict (
         RM = 'Roseman',
         FC = 'Frotcom',
         KM = 'K-Master',
@@ -48,5 +43,3 @@ CONFIG = ConfigDict(
         AR = 'AROBS',
     ),
 )
-
-trace = print if CONFIG.debug is True or '-d' in sys.argv else noop
