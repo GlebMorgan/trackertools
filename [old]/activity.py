@@ -114,7 +114,7 @@ class Activity:
 
     @classmethod
     def fetch(cls):
-        timeular_activities = server.get_activities()
+        timeular_activi ties = server.get_activities()
         cls._update_cache_(timeular_activities)
         cls._update_activities_(timeular_activities)
 

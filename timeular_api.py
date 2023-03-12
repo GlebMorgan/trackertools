@@ -1,10 +1,28 @@
+from __future__ import annotations
+
 import sys
 
 from datetime import date, datetime, time
-from typing import Any, Dict, List, Sequence, Tuple, TypedDict
+from typing import Mapping, Sequence, Tuple, TypedDict
 
-from api import Backend
+from api import Backend, Credentials
 from config import CONFIG, trace
+
+
+class TimeularSpace(TypedDict):
+    id: str
+    name: str
+    members: Sequence[Mapping[str, str]]
+
+
+class TimeularTag(TypedDict):
+    id: int
+    label: str
+
+
+class TimeularMention(TypedDict):
+    id: int
+    label: str
 
 
 class TimeularTask(TypedDict):
@@ -12,46 +30,38 @@ class TimeularTask(TypedDict):
     name: str
 
 
+class TimeularEntryNote(TypedDict):
+    text: str | None
+    tags: Sequence[TimeularTag]
+    mentions: Sequence[TimeularMention]
+
+
+class TimeularEntryDuration(TypedDict):
+    startedAt: str
+    stoppedAt: str
+
+
 class TimeularEntry(TypedDict):
     id: str
     activityId: str
-    duration: Dict[str, Any]
-    note: Dict[str, Any]
-
-
-class TimeularTag(TypedDict):
-    id: str
-    label: str
-    spaceId: str
-
-
-class TimeularMention(TypedDict):
-    id: str
-    label: str
-    spaceId: str
-
-
-class TimeularSpace(TypedDict):
-    id: str
-    name: str
-    members: List[Dict[str, Any]]
+    duration: TimeularEntryDuration
+    note: TimeularEntryNote
 
 
 class Timeular(Backend):
-    """
-    Timeular API docs: https://developers.timeular.com
-    """
+    """Timeular API docs: https://developers.timeular.com"""
 
     api = 'https://api.timeular.com/api/v3'
 
     @classmethod
-    def login(cls, credentials: Dict[str, str] = {}):
+    def login(cls, credentials: Credentials):
         super().login(credentials)
         assert cls._session_ is not None
+        assert 'secret' in credentials
 
         api_keys = {'apiKey': credentials['key'], 'apiSecret': credentials['secret']}
         response = cls._post_('developer/sign-in', request=api_keys)
-        assert isinstance(response, dict)
+        assert isinstance(response, Mapping)
 
         cls._session_.headers.update({'Content-Type': 'application/json'})
         cls._session_.headers.update({'Authorization': f"Bearer {response['token']}"})
@@ -66,10 +76,10 @@ class Timeular(Backend):
     @classmethod
     def get_tasks(cls) -> Sequence[TimeularTask]:
         response = cls._get_('activities')
-        assert isinstance(response, dict)
+        assert isinstance(response, Mapping)
 
-        tasks: List[TimeularTask] = response['activities']
-        assert type(tasks) is list
+        tasks: Sequence[TimeularTask] = response['activities']
+        assert isinstance(tasks, Sequence)
 
         return tasks
 
@@ -79,56 +89,55 @@ class Timeular(Backend):
         end_iso = datetime.combine(end, time.max).isoformat(timespec='milliseconds')
 
         response = cls._get_(f'time-entries/{start_iso}/{end_iso}')
-        assert isinstance(response, dict)
+        assert isinstance(response, Mapping)
 
-        entries: List[TimeularEntry] = response['timeEntries']
+        entries: Sequence[TimeularEntry] = response['timeEntries']
+        assert isinstance(entries, Sequence)
+
         return entries
 
     @classmethod
     def get_tags(cls) -> Tuple[Sequence[TimeularTag], Sequence[TimeularMention]]:
         response = cls._get_('tags-and-mentions')
-        assert isinstance(response, dict)
+        assert isinstance(response, Mapping)
 
-        tags: List[TimeularTag] = response['tags']
-        assert type(tags) is list
+        tags: Sequence[TimeularTag] = response['tags']
+        assert isinstance(tags, Sequence)
 
-        mentions: List[TimeularMention] = response['mentions']
-        assert type(mentions) is list
+        mentions: Sequence[TimeularMention] = response['mentions']
+        assert isinstance(mentions, Sequence)
 
         return tags, mentions
 
     @classmethod
     def get_spaces(cls) -> Sequence[TimeularSpace]:
         response = cls._get_('space')
-        assert isinstance(response, dict)
+        assert isinstance(response, Mapping)
 
-        spaces: List[TimeularSpace] = response['data']
-        assert type(spaces) is list
+        spaces: Sequence[TimeularSpace] = response['data']
+        assert isinstance(spaces, Sequence)
 
         return spaces
 
 
 if __name__ == '__main__':
+    credentials = Credentials(
+        key=CONFIG.api.timeular.key,
+        secret=CONFIG.api.timeular.secret,
+    )
+
     match sys.argv[1:]:
         case ['tasks']:
-            credentials = {
-                'key': CONFIG.api.timeular.key,
-                'secret': CONFIG.api.timeular.secret,
-            }
             Timeular.login(credentials)
             response = Timeular.get_tasks()
-            print(type(response))
+            print(f"Response: {type(response)}")
             print(response)
             Timeular.logout()
 
         case ['entries']:
-            credentials = {
-                'key': CONFIG.api.timeular.key,
-                'secret': CONFIG.api.timeular.secret,
-            }
             Timeular.login(credentials)
-            response = Timeular.get_entries(start=date(2023, 2, 23), end=date(2023, 2, 25))
-            print(type(response))
+            response = Timeular.get_entries(start=date(2023, 1, 23), end=date(2023, 1, 25))
+            print(f"Response: {type(response)}")
             print(response)
             Timeular.logout()
 

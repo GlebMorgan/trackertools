@@ -1,19 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import List, NamedTuple
+from typing import NamedTuple
 
-from api import Json
+from api import BackendData
 from tools import AppError
-
-
-Jira = str | None
-Spec = str | None
 
 
 class ParseError(AppError):
     pass
 
 
-class TEntry(NamedTuple):
+class GenericEntry(NamedTuple):
     id: int
     task: int
     start: datetime
@@ -21,19 +19,19 @@ class TEntry(NamedTuple):
     description: str
 
 
-class TTask(NamedTuple):
+class GenericTask(NamedTuple):
     id: int
     parent: int | None
     title: str
-    jira: Jira
-    spec: Spec
+    jira: str | None
+    spec: str | None
 
 
 class BackendAdapter:
     @classmethod
-    def parse_tasks(cls, raw_tasks: Json) -> List[TTask]:
+    def parse_task(cls, raw_task: BackendData) -> GenericTask:
         raise NotImplementedError
 
     @classmethod
-    def parse_entries(cls, raw_entries: Json) -> List[TEntry]:
+    def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
         raise NotImplementedError

@@ -1,32 +1,95 @@
-from dataclasses import dataclass
-from typing import ClassVar, Dict
+from __future__ import annotations
 
-from backend_adapter import TTask
+import sys
+
+from dataclasses import dataclass
+from typing import ClassVar, Dict, NewType, Sequence
+
+from adapter import GenericTask, ParseError
+from api import BackendData
+from cache import CacheManager, CacheMissError
+from config import CONFIG
+
+
+match CONFIG.backend:
+    case 'timecamp':
+        from timecamp_adapter import TimecampAdapter as Adapter
+        from timecamp_api import Timecamp as Server
+    case 'timeular':
+        from timeular_adapter import TimeularAdapter as Adapter
+        from timeular_api import Timeular as Server
+    case other:
+        raise ImportError(f"Invalid backend config: '{other}'")
+
+
+TaskId = NewType("TaskId", int)
+Jira = NewType("Jira", str)
+Spec = NewType("Spec", str)
 
 
 @dataclass(frozen=True, slots=True)
 class Task:
-    id: int
-    parent: 'Task' | None
+    id: TaskId
+    parent: Task | None
     name: str
-    jira: str | None
-    spec: str | None
+    jira: Jira | None
+    spec: Spec | None
 
-    all: ClassVar[Dict[int, 'Task']] = {}
+    all: ClassVar[Dict[int, Task]] = {}
 
     @classmethod
-    def gen(cls, generic_task: TTask) -> 'Task':
-        """Draft"""
-        id: int = generic_task.id
+    def gen(cls, generic_task: GenericTask) -> Task:
+        task_id = TaskId(generic_task.id)
+        if task_id in cls.all:
+            raise RuntimeError(f"Task '{task_id}': already exists: {cls.all[task_id]}")
 
-        if generic_task.parent is not None:
-            parent = cls.all[generic_task.parent]
-        else:
-            parent = None
+        name = generic_task.title.strip()
+        parent = cls._parse_parent_(generic_task)
+        jira = cls._parse_jira_(generic_task)
+        spec = cls._parse_spec_(generic_task)
 
-        if id in cls.all:
-            raise RuntimeError(f"Activity with {id=} already exists: {cls.all[id]}")
-        return cls(id, parent, generic_task.title, generic_task.jira, generic_task.spec)
+        return cls(task_id, parent, name, jira, spec)
+
+    @classmethod
+    def get(cls, validate: bool = True):
+        try:
+            cls.load(validate)
+        except CacheMissError:
+            cls.fetch(validate)
+
+    @classmethod
+    def fetch(cls, validate: bool = True):
+        """Download tasks from server, store them to cache and load into application"""
+        raw_tasks: Sequence[BackendData] = Server.get_tasks()
+        CacheManager.save(raw_tasks)
+
+        cls.all.clear()
+        for raw_task in raw_tasks:
+            generic_task: GenericTask = Adapter.parse_task(raw_task)
+            task: Task = cls.gen(generic_task)
+            if validate is True:
+                task.check_health()
+
+    @classmethod
+    def load(cls, validate: bool = True):
+        """Load tasks from cache into application"""
+        raw_tasks: Sequence[BackendData] = CacheManager.load_tasks()
+
+        cls.all.clear()
+        for raw_task in raw_tasks:
+            generic_task: GenericTask = Adapter.parse_task(raw_task)
+            task: Task = cls.gen(generic_task)
+            if validate is True:
+                task.check_health()
+
+    def check_health(self) -> bool:
+        healthy: bool = True
+
+        if not self.name:
+            print(f"[WARNING] Task '{self}': Empty title '{self.name}'")
+            healthy = False
+
+        return healthy
 
     def __post_init__(self):
         self.__class__.all[self.id] = self
@@ -38,5 +101,60 @@ class Task:
         return type(other) is type(self) and self.id == other.id
 
     def __str__(self):
-        spec = f'({self.spec})' if self.spec else None
-        return ' '.join(filter(None, (self.jira, self.name, spec)))
+        name = self.name
+        if self.spec:
+            name = f"({self.spec}) {name}"
+        if self.jira:
+            name = f"[{self.jira}] {name}"
+        return name
+
+    @classmethod
+    def _parse_spec_(cls, task: GenericTask) -> Spec | None:
+        if task.spec is None:
+            return None
+
+        if task.spec in CONFIG.specs:
+            return Spec(CONFIG.specs[task.spec])
+
+        if task.spec in CONFIG.specs.values():
+            return Spec(task.spec)
+
+        raise ParseError(f"Task '{task.id}': invalid spec '{task.spec}'")
+
+    @classmethod
+    def _parse_jira_(cls, task: GenericTask) -> Jira | None:
+        if task.jira:
+            return Jira(task.jira)
+
+        name = task.title.strip()
+        if name in CONFIG.general_tasks:
+            jira_id = CONFIG.general_tasks[name]
+            return Jira(jira_id) if jira_id else None
+
+        raise ParseError(f"Task '{task.id}': Invalid general task name '{task.title}'")
+
+    @classmethod
+    def _parse_parent_(cls, task: GenericTask) -> Task | None:
+        if not task.parent:
+            return None
+
+        if task.parent in cls.all:
+            return cls.all[task.parent]
+
+        raise ParseError(f"Task '{task.id}': Parent id '{task.parent}' not in the list")
+
+
+if __name__ == '__main__':
+    match sys.argv[1:]:
+        case ['fetch']:
+            credentials = CONFIG.api.timecamp
+            Server.login(credentials)
+            Task.fetch()
+            Server.logout()
+            print(*Task.all.values(), sep='\n')
+
+        case ['load']:
+            raise NotImplementedError
+
+        case other:
+            pass

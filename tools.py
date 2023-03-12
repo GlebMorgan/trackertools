@@ -41,14 +41,6 @@ class AppError(RuntimeError):
     pass
 
 
-class CacheError(AppError):
-    pass
-
-
-class ParseError(AppError):
-    pass
-
-
 def noop(*args: Any, **kwargs: Any):
     pass
 
@@ -61,12 +53,9 @@ def deprecated(func: Method, *args: Any, **kwargs: Any):
 
 def unwrap(s: str) -> str:
     """Remove wrapping braces from string"""
-    if s[0] == '(' and s[-1] == ')':
-        s = s[1:-1]
-    if s[0] == '[' and s[-1] == ']':
-        s = s[1:-1]
-    if s[0] == '{' and s[-1] == '}':
-        s = s[1:-1]
+    for brackets in zip('{([{', '}])}'):
+        if s[0] == brackets[0] and s[-1] == brackets[1]:
+            s = s[1:-1]
     return s
 
 
@@ -79,6 +68,7 @@ def round_time(dt: datetime, to: int = 5) -> datetime:
 
 
 def round_bounds(start: datetime, end: datetime, to: int = 5) -> Tuple[datetime, datetime]:
+    assert start <= end
     rounding = to * 60
 
     start_seconds = (start.replace(tzinfo=None) - datetime.min).seconds
@@ -163,6 +153,7 @@ if __name__ == '__main__':
                     datetime(2022, 12, 31, 9, 10, 0), datetime(2022, 12, 31, 9, 45, 0)
                 ),
             ]
+            # fmt: on
 
             for start, end, start_ref, end_ref in round_time_tests:
                 start_round, end_round = round_bounds(start, end)
@@ -170,7 +161,6 @@ if __name__ == '__main__':
                 assert end_round == end_ref, f"{end = }, {end_ref = }, {end_round = }"
 
             print("'round_bounds()' tests passed")
-            # fmt: on
 
         case other:
             pass

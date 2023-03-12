@@ -1,51 +1,155 @@
+from __future__ import annotations
+
 import random
+import re
 import string
+import sys
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
-from typing import ClassVar, Dict
+from datetime import date, datetime, timedelta
+from itertools import groupby
+from typing import Callable, ClassVar, Dict, Iterable, List, NewType, Sequence, Tuple
 
-from backend_adapter import TEntry
+from adapter import GenericEntry
+from api import BackendData
+from cache import CacheManager, CacheMissError
+from config import CONFIG
 from task import Task
-from tools import TODAY, AppError, round_bounds, timespan_to_duration
+from tools import TODAY, round_bounds, timespan_to_duration
+
+
+match CONFIG.backend:
+    case 'timecamp':
+        from timecamp_adapter import TimecampAdapter as Adapter
+        from timecamp_api import Timecamp as Server
+    case 'timeular':
+        from timeular_adapter import TimeularAdapter as Adapter
+        from timeular_api import Timeular as Server
+    case other:
+        raise ImportError(f"Invalid backend config: '{other}'")
+
+
+Alias = NewType("Alias", str)
 
 
 @dataclass(slots=True)
 class Entry:
-    alias: str = field(init=False, compare=False)
+    alias: Alias = field(init=False, compare=False)
     task: Task
-    day: date
-    start: time
-    span: timedelta
+    start: datetime
+    end: datetime
     text: str
 
-    all: ClassVar[Dict[str, 'Entry']] = {}
+    all: ClassVar[Dict[Alias, Entry]] = {}
 
-    @classmethod
-    def gen(cls, generic_entry: TEntry) -> 'Entry':
-        task_id: int = generic_entry.task
-        assert task_id in Task.all
+    @property
+    def day(self) -> date:
+        return self.start.date()
 
-        start: datetime = generic_entry.start
-        end: datetime = generic_entry.end
-        start, end = round_bounds(start, end)
-        assert start.date() <= TODAY
-        assert end.date() <= TODAY
-
-        text: str = generic_entry.description
-
-        return cls(Task.all[task_id], start.date(), start.time(), end - start, text)
-
-    def validate(self):
-        if not self.text and self.task.jira is not None:
-            print(f"WARNING: {self.task.name} ({self.day} {self.start}): no description")
+    @property
+    def span(self) -> timedelta:
+        return self.end - self.start
 
     @property
     def duration(self) -> str:
         return timespan_to_duration(self.span)
 
+    @classmethod
+    def gen(cls, generic_entry: GenericEntry) -> Entry:
+        task_id: int = generic_entry.task
+        assert task_id in Task.all
+
+        start, end = round_bounds(generic_entry.start, generic_entry.end)
+        assert start <= end
+
+        text: str = generic_entry.description
+
+        return cls(Task.all[task_id], start, end, text)
+
+    @classmethod
+    def get(cls, since: date, until: date, validate: bool = True):
+        try:
+            cls.load(since, until, validate)
+        except CacheMissError:
+            cls.fetch(since, until, validate)
+
+    @classmethod
+    def fetch(cls, since: date, until: date, validate: bool = True):
+        """Download entries from server, store them to cache and load into application"""
+        raw_entries: Sequence[BackendData] = Server.get_entries(since, until)
+        CacheManager.save(raw_entries)
+
+        cls.all.clear()
+        for raw_entry in raw_entries:
+            generic_entry: GenericEntry = Adapter.parse_entry(raw_entry)
+            entry: Entry = cls.gen(generic_entry)
+            if validate is True:
+                entry.check_health()
+
+    @classmethod
+    def load(cls, since: date, until: date, validate: bool = True):
+        """Load entries from cache into application"""
+        raw_entries: Sequence[BackendData] = CacheManager.load_entries(since, until)
+
+        cls.all.clear()
+        for raw_entry in raw_entries:
+            generic_entry: GenericEntry = Adapter.parse_entry(raw_entry)
+            if cls._within_dates_(generic_entry.start, generic_entry.end, since, until):
+                entry: Entry = cls.gen(generic_entry)
+                if validate is True:
+                    entry.check_health()
+
+    @classmethod
+    def combine(cls, entries: Iterable[Entry]) -> int:
+        deleted = 0
+
+        sorted_entries: List[Entry] = sorted(entries, key=cls._grouping_order_)
+        for key, group in groupby(sorted_entries, key=cls._grouping_order_):
+            fragments: List[Entry] = sorted(group, key=lambda e: e.start)
+            total_duration: timedelta = sum((e.span for e in fragments), start=timedelta())
+
+            composite_entry = fragments[0]
+            composite_entry.end = composite_entry.start + total_duration
+            for entry in fragments[1:]:
+                entry.delete()
+                deleted += 1
+
+        return deleted
+
+    @classmethod
+    def combine_all(cls) -> int:
+        return cls.combine(cls.all.values())
+
+    @classmethod
+    def combine_for(cls, since: date, until: date) -> int:
+        range_filter: Callable[[Entry], bool] = lambda e: since <= e.start.date() <= until
+        return cls.combine(filter(range_filter, Entry.all.values()))
+
+    def delete(self):
+        del self.__class__.all[self.alias]
+
+    def check_health(self) -> bool:
+        healthy: bool = True
+        if not self.text and self.task.jira is not None:
+            print(f"[WARNING] Entry '{self}' has no description")
+            healthy = False
+        if self.start.date() <= TODAY or self.end.date() <= TODAY:
+            print(f"[WARNING] Entry '{self}' day is invalid: {self.day}")
+            healthy = False
+        if self.start.date() != self.end.date():
+            print(f"[WARNING] Entry '{self}' spans across multiple days")
+            healthy = False
+        return healthy
+
+    def fix_whitespace(self) -> bool:
+        fixed_text, count = re.subn(r' +', ' ', self.text)
+        if count > 0:
+            self.text = fixed_text
+            return True
+        return False
+
     def __post_init__(self):
-        self.alias = self.__class__._gen_alias_()
+        self.alias = Alias(self.__class__._gen_alias_())
         self.__class__.all[self.alias] = self
 
     def __str__(self):
@@ -58,15 +162,34 @@ class Entry:
         start_time = f"{self.start.hour:02}:{self.start.minute:02}"
         return f"{self.alias}: {task} ({self.day} {start_time} {self.duration})"
 
-    def __class_getitem__(cls, alias: str) -> "Entry":
-        try:
-            return cls.all[alias]
-        except KeyError:
-            raise AppError(f"No such entry '{alias}'")
-
     @classmethod
     def _gen_alias_(cls):
         while True:
             alias = str().join(random.choice(string.ascii_uppercase) for char in 'XX')
             if alias not in cls.all.keys():
                 return alias
+
+    @staticmethod
+    def _within_dates_(start: datetime, end: datetime, first: date, last: date) -> bool:
+        return first <= start.date() <= last or first <= end.date() <= last
+
+    @staticmethod
+    def _grouping_order_(entry: Entry) -> Tuple[date, int, str]:
+        return (entry.start.date(), entry.task.id, entry.text)
+
+
+if __name__ == '__main__':
+    match sys.argv[1:]:
+        case ['fetch']:
+            credentials = CONFIG.api.timecamp
+            Server.login(credentials)
+            Task.fetch()
+            Entry.fetch(since=date(2023, 3, 6), until=date(2023, 3, 7))
+            Server.logout()
+            print(*Entry.all.values(), sep='\n')
+
+        case ['load']:
+            raise NotImplementedError
+
+        case other:
+            pass

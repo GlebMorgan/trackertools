@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import re
 import sys
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple, cast
 
-from backend_adapter import BackendAdapter, Jira, ParseError, Spec, TEntry, TTask
-from timeular import TimeularEntry, TimeularTask
+from adapter import BackendAdapter, GenericEntry, GenericTask, ParseError
+from api import BackendData
+from timeular_api import TimeularEntry, TimeularEntryNote
+from timeular_api import TimeularMention, TimeularTag, TimeularTask
+from tools import unwrap
 
 
 # JIRA_REGEX = re.compile(r'\[([A-Z0-9]+-[0-9]+)\] ')
@@ -17,52 +22,56 @@ TASK_NAME_REGEX = re.compile(
 
 class TimeularAdapter(BackendAdapter):
     @classmethod
-    def parse_task(cls, raw_task: TimeularTask) -> TTask:
+    def parse_task(cls, raw_task: BackendData) -> GenericTask:
+        timeular_task = cast(TimeularTask, raw_task)
         try:
-            task_id: int = int(raw_task['id'])
+            task_id: int = int(timeular_task['id'])
         except (ValueError, TypeError):
             error_msg = "Invalid task id '{id}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise ParseError(error_msg.format(**timeular_task))
 
-        title, jira, spec = cls._parse_title_(raw_task)
+        title, jira, spec = cls._parse_title_(timeular_task)
 
-        return TTask(task_id, None, title, jira, spec)
+        return GenericTask(task_id, None, title, jira, spec)
 
     @classmethod
-    def parse_entry(cls, raw_entry: TimeularEntry) -> TEntry:
+    def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
+        timeular_entry = cast(TimeularEntry, raw_entry)
         try:
-            entry_id: int = int(raw_entry['id'])
+            entry_id: int = int(timeular_entry['id'])
         except (ValueError, TypeError):
             error_msg = "Invalid entry id '{id}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timeular_entry))
 
         try:
-            task_id: int = int(raw_entry['activityId'])
+            task_id: int = int(timeular_entry['activityId'])
         except (ValueError, TypeError):
             error_msg = "Entry '{id}': Invalid task id '{activityId}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timeular_entry))
 
         try:
-            start: datetime = datetime.fromisoformat(raw_entry['duration']['startedAt'])
+            raw_start_timestamp = timeular_entry['duration']['startedAt']
+            start: datetime = datetime.fromisoformat(raw_start_timestamp)
         except ValueError:
             error_msg = "Entry '{id}': Invalid start time format '{duration[startedAt]}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timeular_entry))
 
         try:
-            end: datetime = datetime.fromisoformat(raw_entry['duration']['stoppedAt'])
+            raw_end_timestamp = timeular_entry['duration']['stoppedAt']
+            end: datetime = datetime.fromisoformat(raw_end_timestamp)
         except ValueError:
             error_msg = "Entry '{id}': Invalid end time format '{duration[stoppedAt]}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timeular_entry))
 
         start = start.replace(tzinfo=timezone.utc).astimezone()
         end = end.replace(tzinfo=timezone.utc).astimezone()
 
-        text = cls._parse_tags_(raw_entry['note'])
+        text = cls._parse_tags_(timeular_entry['note'])
 
-        return TEntry(entry_id, task_id, start, end, text)
+        return GenericEntry(entry_id, task_id, start, end, text)
 
     @staticmethod
-    def _parse_title_(raw_task: TimeularTask) -> Tuple[str, Jira, Spec]:
+    def _parse_title_(raw_task: TimeularTask) -> Tuple[str, str, str]:
         # TODO: review the algorithm
 
         match = TASK_NAME_REGEX.match(raw_task['name'].strip())
@@ -75,6 +84,7 @@ class TimeularAdapter(BackendAdapter):
         if title is None:
             error_msg = "Task '{id}': Missing task title: '{name}'"
             raise ParseError(error_msg.format(**raw_task))
+        title = unwrap(title).strip()
 
         jira = match['jira']
         if jira is not None:
@@ -82,7 +92,6 @@ class TimeularAdapter(BackendAdapter):
                 jira = f"FM64-{jira}"
 
         spec = match['spec']
-
         if spec is not None and jira is None:
             error_msg = "Task '{id}': Missing jira id: '{name}'"
             raise ParseError(error_msg.format(**raw_task))
@@ -90,28 +99,23 @@ class TimeularAdapter(BackendAdapter):
         return title, jira, spec
 
     @classmethod
-    def _parse_tags_(cls, raw_entry_note: Dict[str, Any]) -> str:
-        Tags = List[Dict[str, str | int]]
+    def _parse_tags_(cls, raw_entry_note: TimeularEntryNote) -> str:
         Mentions = List[Dict[str, str | int]]
 
         text: str | None = raw_entry_note['text']
         if text is None:
             return ''
 
-        tags: Tags = raw_entry_note['tags']
-        assert type(tags) is list
-
+        tags: Sequence[TimeularTag] = raw_entry_note['tags']
         for tag in tags:
-            assert type(id := tag['id']) is int
-            assert type(label := tag['label']) is str
+            id = tag['id']
+            label = tag['label']
             text = text.replace(f"<{{{{|t|{id}|}}}}>", label)
 
-        mentions: Mentions = raw_entry_note['mentions']
-        assert type(mentions) is list
-
+        mentions: Sequence[TimeularMention] = raw_entry_note['mentions']
         for mention in mentions:
-            assert type(id := mention['id']) is int
-            assert type(label := mention['label']) is str
+            id = mention['id']
+            label = mention['label']
             text = text.replace(f"<{{{{|m|{id}|}}}}>", f"@{label}")
 
         return text
@@ -127,21 +131,11 @@ if __name__ == '__main__':
             'startedAt': '2022-05-27T08:00:00.000',
             'stoppedAt': '2022-05-27T09:10:00.000',
         },
-        note={
-            'text': '<{{|t|2693042|}}> 71 (with <{{|m|205973|}}>)',
-            'tags': [
-                {
-                    'id': 2693042,
-                    'label': 'Sprint',
-                },
-            ],
-            'mentions': [
-                {
-                    'id': 205973,
-                    'label': 'Person',
-                }
-            ],
-        },
+        note=TimeularEntryNote(
+            text='<{{|t|2693042|}}> 71 (with <{{|m|205973|}}>)',
+            tags=[TimeularTag(id=2693042, label='Sprint')],
+            mentions=[TimeularMention(id=205973, label='Person')],
+        ),
     )
 
     test_raw_task = TimeularTask(

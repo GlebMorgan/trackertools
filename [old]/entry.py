@@ -79,8 +79,12 @@ class Entry:
 
     @classmethod
     def _validate_cache_(cls, day: date, timeular_entries: Iterable[TEntry]):
-        start_of_day = datetime.combine(day, time.min).replace(tzinfo=timezone.utc).astimezone()
-        end_of_day = datetime.combine(day, time.max).replace(tzinfo=timezone.utc).astimezone()
+        start_of_day = (
+            datetime.combine(day, time.min).replace(tzinfo=timezone.utc).astimezone()
+        )
+        end_of_day = (
+            datetime.combine(day, time.max).replace(tzinfo=timezone.utc).astimezone()
+        )
         for timeular_entry in timeular_entries:
             start, end = cls._parse_duration_(timeular_entry)
             if start < start_of_day or start > end_of_day:
@@ -127,11 +131,13 @@ class Entry:
         start, end = round_time_bounds(*cls._parse_duration_(timeular_entry))
         text = cls._parse_tags_(timeular_entry['note'])
         if not text and activity.jira is not None:
-            print(f"WARNING: time entry at {start.date()} {start.time()} has no description")
+            print(
+                f"WARNING: time entry at {start.date()} {start.time()} has no description"
+            )
         return cls(activity, start, end - start, text)
 
     @classmethod
-    def clear_cache(cls, until: date|None = None):
+    def clear_cache(cls, until: date | None = None):
         """Delete cache files with entries older than specified date"""
         date_regex = re.compile(re.sub(r'{(\w*)}', r'(?P<\1>.+?)', cls.cache))
         for entry_cache_file in CONFIG.cache_path.glob(cls.cache.format(date='*')):
@@ -147,7 +153,9 @@ class Entry:
             entry_cache_file.unlink()
 
     @classmethod
-    def load(cls, since: date, until: date, validate: bool = True, ignore_missing: bool = False) -> int:
+    def load(
+        cls, since: date, until: date, validate: bool = True, ignore_missing: bool = False
+    ) -> int:
         """Load entries from cache into application"""
         loaded = 0
         cls.all.clear()
@@ -180,7 +188,9 @@ class Entry:
         timeular_entries = server.get_entries(start, end)
 
         timeular_entries.sort(key=cls._parse_duration_)
-        group_by_date: Callable[[TEntry], date] = lambda item: cls._parse_duration_(item)[0].date()
+        group_by_date: Callable[[TEntry], date] = lambda item: cls._parse_duration_(item)[
+            0
+        ].date()
         entries_grouper = groupby(timeular_entries, key=group_by_date)
 
         created = 0
@@ -198,7 +208,9 @@ class Entry:
         sorted_entries: List[Entry] = sorted(entries, key=cls._combine_order_)
         for key, entries_to_combine in groupby(sorted_entries, key=cls._combine_order_):
             entries_to_combine = sorted(entries_to_combine, key=lambda e: e.start)
-            total_duration = sum((entry.span for entry in entries_to_combine), start=timedelta())
+            total_duration = sum(
+                (entry.span for entry in entries_to_combine), start=timedelta()
+            )
             entries_to_combine[0].span = total_duration
             for entry in entries_to_combine[1:]:
                 entry.delete()
@@ -211,7 +223,9 @@ class Entry:
 
     @classmethod
     def combine_for(cls, since: date, until: date) -> int:
-        filter_by_interval: Callable[[Entry], bool] = lambda e: since <= e.start.date() <= until
+        filter_by_interval: Callable[[Entry], bool] = (
+            lambda e: since <= e.start.date() <= until
+        )
         return cls.combine(filter(filter_by_interval, Entry.all.values()))
 
     @property
@@ -232,7 +246,7 @@ class Entry:
     def get_duration(self):
         hours, minutes, seconds = str(self.span).split(':')
         if self.span.days > 1:
-            hours = int(hours.split()[-1]) + 24*self.span.days
+            hours = int(hours.split()[-1]) + 24 * self.span.days
         h = f'{hours}h' if int(hours) else ''
         m = f'{minutes}m' if int(minutes) else ''
         return f"{h} {m}".strip()

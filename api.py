@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import sys
 
 from datetime import date
-from typing import Any, ClassVar, Dict, List, Sequence, TypedDict
+from typing import Any, ClassVar, Mapping, NotRequired, Sequence, TypedDict
 
 from requests import Session
 
@@ -9,14 +11,22 @@ from config import trace
 from tools import AppError
 
 
-Json = Dict[str, Any] | List[Dict[str, Any]]
+BackendData = Mapping[str, Any]
+Json = Mapping[str, Any] | Sequence[Mapping[str, Any]]
+
+
+class Credentials(TypedDict):
+    key: str
+    secret: NotRequired[str]
 
 
 class Backend:
+    # TODO: Make this class generic with `TypeVar`s: `BackendTask`, `BackendEntry`
+
     api: ClassVar[str]
 
     @classmethod
-    def login(cls, credentials: Dict[str, str]):
+    def login(cls, credentials: Credentials):
         if cls._session_ is not None:
             trace("Already logged in")
             return
@@ -29,11 +39,11 @@ class Backend:
             cls._session_ = None
 
     @classmethod
-    def get_tasks(cls) -> Sequence[TypedDict]:
+    def get_tasks(cls) -> Sequence[BackendData]:
         raise NotImplementedError
 
     @classmethod
-    def get_entries(cls, start: date, end: date) -> Sequence[TypedDict]:
+    def get_entries(cls, start: date, end: date) -> Sequence[BackendData]:
         raise NotImplementedError
 
     _session_: ClassVar[Session | None] = None
@@ -65,15 +75,17 @@ if __name__ == '__main__':
     class HTTPBin(Backend):
         api = 'https://httpbin.org'
 
+    dummy_credentials = Credentials(key='...')
+
     match sys.argv[1:]:
         case ['get']:
-            HTTPBin.login({})
+            HTTPBin.login(dummy_credentials)
             reply = HTTPBin._get_("get")
             print(reply)
             HTTPBin.logout()
 
         case ['post']:
-            HTTPBin.login({})
+            HTTPBin.login(dummy_credentials)
             request = {'key': 'value'}
             reply = HTTPBin._post_("post", request)
             print(reply)

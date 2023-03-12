@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import sys
 
 from datetime import date
-from typing import Dict, List, Sequence, TypedDict, cast
+from operator import itemgetter
+from typing import List, Mapping, Sequence, TypedDict, cast
 
-from api import Backend
+from api import Backend, Credentials
 from config import CONFIG
 
 
 class TimecampTask(TypedDict):
     task_id: int
     parent_id: int
+    level: int
     name: str
 
 
@@ -25,14 +29,12 @@ class TimecampEntry(TypedDict):
 
 
 class Timecamp(Backend):
-    """
-    Timecamp API docs: https://developer.timecamp.com
-    """
+    """Timecamp API docs: https://developer.timecamp.com"""
 
     api = 'https://app.timecamp.com/third_party/api'
 
     @classmethod
-    def login(cls, credentials: Dict[str, str] = {}):
+    def login(cls, credentials: Credentials):
         super().login(credentials)
         assert cls._session_ is not None
 
@@ -46,15 +48,18 @@ class Timecamp(Backend):
     @classmethod
     def get_tasks(cls) -> Sequence[TimecampTask]:
         response = cls._get_('tasks', format='json')
-        assert isinstance(response, dict)
-        raw_tasks: List[TimecampTask] = list(response.values())
+        assert isinstance(response, Mapping)
+        assert all('level' in raw_task for raw_task in response.values())
+
+        raw_tasks: List[TimecampTask] = sorted(response.values(), key=itemgetter('level'))
         return raw_tasks
 
     @classmethod
     def get_entries(cls, start: date, end: date) -> Sequence[TimecampEntry]:
         args = {'from': start.isoformat(), 'to': end.isoformat()}
         response = cls._get_('entries', format='json', **args)
-        assert isinstance(response, list)
+        assert isinstance(response, Sequence)
+
         raw_entries: List[TimecampEntry] = cast(List[TimecampEntry], response)
         return raw_entries
 
@@ -64,14 +69,14 @@ if __name__ == '__main__':
         case ['tasks']:
             Timecamp.login({'key': CONFIG.api.timecamp.key})
             response = Timecamp.get_tasks()
-            print(type(response))
+            print(f"Response: {type(response)}")
             print(response)
             Timecamp.logout()
 
         case ['entries']:
             Timecamp.login({'key': CONFIG.api.timecamp.key})
             response = Timecamp.get_entries(start=date(2023, 2, 27), end=date(2023, 3, 2))
-            print(type(response))
+            print(f"Response: {type(response)}")
             print(response)
             Timecamp.logout()
 

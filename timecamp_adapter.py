@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import re
 import sys
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from typing import Tuple
 
-from backend_adapter import BackendAdapter, Jira, ParseError, TEntry, TTask
-from timecamp import TimecampEntry, TimecampTask
+from adapter import BackendAdapter, GenericEntry, GenericTask, ParseError
+from api import BackendData
+from timecamp_api import TimecampEntry, TimecampTask
 from tools import Format
 
 
@@ -15,66 +18,70 @@ TASK_NAME_REGEX = re.compile(r'(?:\[(?P<jira>[A-Z0-9]+-[0-9]+)\])?\s*(?:(?P<titl
 
 class TimecampAdapter(BackendAdapter):
     @classmethod
-    def parse_task(cls, raw_task: TimecampTask) -> TTask:
+    def parse_task(cls, raw_task: BackendData) -> GenericTask:
+        timecamp_task = TimecampTask(**raw_task)
         try:
-            task_id: int = int(raw_task['task_id'])
+            task_id: int = int(timecamp_task['task_id'])
         except (ValueError, TypeError):
             error_msg = "Invalid task id '{task_id}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise ParseError(error_msg.format(**timecamp_task))
 
         try:
-            parent_id: int = int(raw_task['parent_id'])
+            parent_id: int = int(timecamp_task['parent_id'])
         except (ValueError, TypeError):
             error_msg = "Task '{task_id}': Invalid parent id '{parent_id}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise ParseError(error_msg.format(**timecamp_task))
 
-        title, jira = cls._parse_title_(raw_task)
+        title, jira = cls._parse_title_(timecamp_task)
 
         # TODO: get spec from task tags
 
-        return TTask(task_id, parent_id, title, jira, spec=None)
+        return GenericTask(task_id, parent_id, title, jira, spec=None)
 
     @classmethod
-    def parse_entry(cls, raw_entry: TimecampEntry) -> TEntry:
+    def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
+        timecamp_entry = TimecampEntry(**raw_entry)
         try:
-            entry_id: int = int(raw_entry['id'])
+            entry_id: int = int(timecamp_entry['id'])
         except (ValueError, TypeError):
             error_msg = "Invalid entry id '{id}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timecamp_entry))
 
         try:
-            task_id: int = int(raw_entry['task_id'])
+            task_id: int = int(timecamp_entry['task_id'])
         except (ValueError, TypeError):
             error_msg = "Entry '{id}': Invalid task id '{task_id}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timecamp_entry))
 
         try:
-            day: date = date.fromisoformat(raw_entry['date'])
+            day: date = date.fromisoformat(timecamp_entry['date'])
         except ValueError:
             error_msg = "Entry '{id}': Invalid date format '{date}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timecamp_entry))
 
         try:
-            start_time: time = datetime.strptime(raw_entry['start_time'], Format.HMS).time()
+            raw_start_time = timecamp_entry['start_time']
+            start_time: time = datetime.strptime(raw_start_time, Format.HMS).time()
         except ValueError:
             error_msg = "Entry '{id}': Invalid start time format '{start_time}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timecamp_entry))
 
         try:
-            end_time: time = datetime.strptime(raw_entry['end_time'], Format.HMS).time()
+            raw_end_time = timecamp_entry['end_time']
+            end_time: time = datetime.strptime(raw_end_time, Format.HMS).time()
         except ValueError:
             error_msg = "Entry '{id}': Invalid end time format '{end_time}'"
-            raise ParseError(error_msg.format(**raw_entry))
+            raise ParseError(error_msg.format(**timecamp_entry))
 
-        start = datetime.combine(day, start_time)
-        end = datetime.combine(day, end_time)
+        start = datetime.combine(day, start_time).replace(tzinfo=timezone.utc).astimezone()
+        end = datetime.combine(day, end_time).replace(tzinfo=timezone.utc).astimezone()
 
-        text = raw_entry['description']
+        text = timecamp_entry['description']
 
-        return TEntry(entry_id, task_id, start, end, text)
+        return GenericEntry(entry_id, task_id, start, end, text)
 
     @staticmethod
-    def _parse_title_(raw_task: TimecampTask) -> Tuple[str, Jira]:
+    def _parse_title_(raw_task: TimecampTask) -> Tuple[str, str]:
         # TODO: review the algorithm
 
         match = TASK_NAME_REGEX.match(raw_task['name'].strip())
@@ -107,6 +114,7 @@ if __name__ == '__main__':
     test_raw_task = TimecampTask(
         task_id=12345678,
         parent_id=0,
+        level=1,
         name="[FMXX-1234] (TT) Task name (valid)",
     )
 
