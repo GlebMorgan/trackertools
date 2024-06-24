@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-
 from datetime import date
 from typing import Any, ClassVar, Mapping, NotRequired, Sequence, TypedDict
 
@@ -15,15 +14,17 @@ BackendData = Mapping[str, Any]
 Json = Mapping[str, Any] | Sequence[Mapping[str, Any]]
 
 
+class ApiError(AppError):
+    pass
+
+
 class Credentials(TypedDict):
     key: str
     secret: NotRequired[str]
 
 
 class Backend:
-    # TODO: Make this class generic with `TypeVar`s: `BackendTask`, `BackendEntry`
-
-    api: ClassVar[str]
+    API: ClassVar[str]
 
     @classmethod
     def login(cls, credentials: Credentials):
@@ -52,9 +53,9 @@ class Backend:
     def _get_(cls, path: str, **kwargs: Any) -> Json:
         if cls._session_ is None:
             raise AppError("Session is not open")
-        response = cls._session_.get(f'{cls.api}/{path}', params=kwargs)
+        response = cls._session_.get(f'{cls.API}/{path}', params=kwargs)
         if not response:
-            raise AppError(f"GET /{path} - code {response.status_code} - {response.text}")
+            raise ApiError(f"GET /{path} - code {response.status_code} - {response.text}")
         trace(f"GET /{path} - OK {response.status_code}")
         return response.json()
 
@@ -62,18 +63,18 @@ class Backend:
     def _post_(cls, path: str, request: Json | None = None) -> Json:
         if cls._session_ is None:
             raise AppError("Session is not open")
-        response = cls._session_.post(f'{cls.api}/{path}', json=request)
+        response = cls._session_.post(f'{cls.API}/{path}', json=request)
         if not response:
-            raise AppError(f"POST /{path} - code {response.status_code} - {response.text}")
+            raise ApiError(f"POST /{path} - code {response.status_code} - {response.text}")
         trace(f"POST /{path} - OK {response.status_code}")
         return response.json() if request else {}
 
 
 if __name__ == '__main__':
-    # pyright: reportPrivateUsage=false
+    # pylint: disable=protected-access, abstract-method
 
     class HTTPBin(Backend):
-        api = 'https://httpbin.org'
+        API = 'https://httpbin.org'
 
     dummy_credentials = Credentials(key='...')
 
@@ -86,8 +87,8 @@ if __name__ == '__main__':
 
         case ['post']:
             HTTPBin.login(dummy_credentials)
-            request = {'key': 'value'}
-            reply = HTTPBin._post_("post", request)
+            sample_request = {'key': 'value'}
+            reply = HTTPBin._post_("post", sample_request)
             print(reply)
             HTTPBin.logout()
 

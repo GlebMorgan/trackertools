@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import sys
-
 from dataclasses import dataclass
 from typing import ClassVar, Dict, NewType, Sequence
 
-from adapter import GenericTask, ParseError
+from adapter import BackendDataError, GenericTask
 from api import BackendData
-from cache import CacheManager, CacheMissError
-from config import CONFIG
+from cache import CacheManager
+from config import CONFIG, trace
 
 
 match CONFIG.backend:
@@ -18,8 +17,8 @@ match CONFIG.backend:
     case 'timeular':
         from timeular_adapter import TimeularAdapter as Adapter
         from timeular_api import Timeular as Server
-    case other:
-        raise ImportError(f"Invalid backend config: '{other}'")
+    case unsupported:
+        raise ImportError(f"Invalid backend config: '{unsupported}'")
 
 
 TaskId = NewType("TaskId", int)
@@ -51,15 +50,10 @@ class Task:
         return cls(task_id, parent, name, jira, spec)
 
     @classmethod
-    def get(cls, validate: bool = True):
-        try:
-            cls.load(validate)
-        except CacheMissError:
-            cls.fetch(validate)
-
-    @classmethod
     def fetch(cls, validate: bool = True):
         """Download tasks from server, store them to cache and load into application"""
+
+        trace("Fetching tasks...")
         raw_tasks: Sequence[BackendData] = Server.get_tasks()
         CacheManager.save(raw_tasks)
 
@@ -119,7 +113,7 @@ class Task:
         if task.spec in CONFIG.specs.values():
             return Spec(task.spec)
 
-        raise ParseError(f"Task '{task.id}': invalid spec '{task.spec}'")
+        raise BackendDataError(f"Task '{task.id}': invalid spec '{task.spec}'")
 
     @classmethod
     def _parse_jira_(cls, task: GenericTask) -> Jira | None:
@@ -127,11 +121,13 @@ class Task:
             return Jira(task.jira)
 
         name = task.title.strip()
-        if name in CONFIG.general_tasks:
-            jira_id = CONFIG.general_tasks[name]
+        if name in CONFIG.tasks:
+            jira_id = CONFIG.tasks[name]
             return Jira(jira_id) if jira_id else None
 
-        raise ParseError(f"Task '{task.id}': Invalid general task name '{task.title}'")
+        raise BackendDataError(
+            f"Task '{task.id}': Invalid general task name '{task.title}'"
+        )
 
     @classmethod
     def _parse_parent_(cls, task: GenericTask) -> Task | None:
@@ -141,20 +137,22 @@ class Task:
         if task.parent in cls.all:
             return cls.all[task.parent]
 
-        raise ParseError(f"Task '{task.id}': Parent id '{task.parent}' not in the list")
+        raise BackendDataError(
+            f"Task '{task.id}': Parent id '{task.parent}' not in the list"
+        )
 
 
 if __name__ == '__main__':
     match sys.argv[1:]:
         case ['fetch']:
-            credentials = CONFIG.api.timecamp
+            credentials = CONFIG.credentials.timecamp
             Server.login(credentials)
             Task.fetch()
             Server.logout()
             print(*Task.all.values(), sep='\n')
 
         case ['load']:
-            raise NotImplementedError
+            print(NotImplemented)
 
-        case other:
+        case _:
             pass

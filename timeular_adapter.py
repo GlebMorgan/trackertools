@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import re
 import sys
-
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Sequence, Tuple, cast
 
-from adapter import BackendAdapter, GenericEntry, GenericTask, ParseError
+from adapter import BackendAdapter, BackendDataError, GenericEntry, GenericTask
 from api import BackendData
-from timeular_api import TimeularEntry, TimeularEntryNote
-from timeular_api import TimeularMention, TimeularTag, TimeularTask
-from tools import unwrap
+from timeular_api import (
+    TimeularEntry,
+    TimeularEntryNote,
+    TimeularMention,
+    TimeularTag,
+    TimeularTask,
+)
+from tools import CURRENT_TZ, unwrap
 
 
 # JIRA_REGEX = re.compile(r'\[([A-Z0-9]+-[0-9]+)\] ')
@@ -26,9 +30,9 @@ class TimeularAdapter(BackendAdapter):
         timeular_task = cast(TimeularTask, raw_task)
         try:
             task_id: int = int(timeular_task['id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Invalid task id '{id}'"
-            raise ParseError(error_msg.format(**timeular_task))
+            raise BackendDataError(error_msg.format(**timeular_task)) from cause
 
         title, jira, spec = cls._parse_title_(timeular_task)
 
@@ -39,32 +43,32 @@ class TimeularAdapter(BackendAdapter):
         timeular_entry = cast(TimeularEntry, raw_entry)
         try:
             entry_id: int = int(timeular_entry['id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Invalid entry id '{id}'"
-            raise ParseError(error_msg.format(**timeular_entry))
+            raise BackendDataError(error_msg.format(**timeular_entry)) from cause
 
         try:
             task_id: int = int(timeular_entry['activityId'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Entry '{id}': Invalid task id '{activityId}'"
-            raise ParseError(error_msg.format(**timeular_entry))
+            raise BackendDataError(error_msg.format(**timeular_entry)) from cause
 
         try:
             raw_start_timestamp = timeular_entry['duration']['startedAt']
             start: datetime = datetime.fromisoformat(raw_start_timestamp)
-        except ValueError:
+        except ValueError as cause:
             error_msg = "Entry '{id}': Invalid start time format '{duration[startedAt]}'"
-            raise ParseError(error_msg.format(**timeular_entry))
+            raise BackendDataError(error_msg.format(**timeular_entry)) from cause
 
         try:
             raw_end_timestamp = timeular_entry['duration']['stoppedAt']
             end: datetime = datetime.fromisoformat(raw_end_timestamp)
-        except ValueError:
+        except ValueError as cause:
             error_msg = "Entry '{id}': Invalid end time format '{duration[stoppedAt]}'"
-            raise ParseError(error_msg.format(**timeular_entry))
+            raise BackendDataError(error_msg.format(**timeular_entry)) from cause
 
-        start = start.replace(tzinfo=timezone.utc).astimezone()
-        end = end.replace(tzinfo=timezone.utc).astimezone()
+        start = start.replace(tzinfo=CURRENT_TZ)
+        end = end.replace(tzinfo=CURRENT_TZ)
 
         text = cls._parse_tags_(timeular_entry['note'])
 
@@ -78,12 +82,12 @@ class TimeularAdapter(BackendAdapter):
 
         if not match:
             error_msg = "Task '{id}': Invalid task name format: '{name}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise BackendDataError(error_msg.format(**raw_task))
 
         title = match['title']
         if title is None:
             error_msg = "Task '{id}': Missing task title: '{name}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise BackendDataError(error_msg.format(**raw_task))
         title = unwrap(title).strip()
 
         jira = match['jira']
@@ -94,7 +98,7 @@ class TimeularAdapter(BackendAdapter):
         spec = match['spec']
         if spec is not None and jira is None:
             error_msg = "Task '{id}': Missing jira id: '{name}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise BackendDataError(error_msg.format(**raw_task))
 
         return title, jira, spec
 
@@ -108,21 +112,21 @@ class TimeularAdapter(BackendAdapter):
 
         tags: Sequence[TimeularTag] = raw_entry_note['tags']
         for tag in tags:
-            id = tag['id']
+            tag_id = tag['id']
             label = tag['label']
-            text = text.replace(f"<{{{{|t|{id}|}}}}>", label)
+            text = text.replace(f"<{{{{|t|{tag_id}|}}}}>", label)
 
         mentions: Sequence[TimeularMention] = raw_entry_note['mentions']
         for mention in mentions:
-            id = mention['id']
+            tag_id = mention['id']
             label = mention['label']
-            text = text.replace(f"<{{{{|m|{id}|}}}}>", f"@{label}")
+            text = text.replace(f"<{{{{|m|{tag_id}|}}}}>", f"@{label}")
 
         return text
 
 
 if __name__ == '__main__':
-    # pyright: reportPrivateUsage=false
+    # pylint: disable=protected-access
 
     test_raw_entry = TimeularEntry(
         id='59706926',
@@ -145,16 +149,16 @@ if __name__ == '__main__':
 
     match sys.argv[1:]:
         case ['entry']:
-            entry = TimeularAdapter.parse_entry(test_raw_entry)
-            print(entry)
+            test_entry = TimeularAdapter.parse_entry(test_raw_entry)
+            print(test_entry)
 
         case ['task']:
-            task = TimeularAdapter.parse_task(test_raw_task)
-            print(task)
+            test_task = TimeularAdapter.parse_task(test_raw_task)
+            print(test_task)
 
         case ['title']:
-            title, jira, spec = TimeularAdapter._parse_title_(test_raw_task)
-            print(f"{title=}, {jira=}, {spec=}")
+            test_title, test_jira, test_spec = TimeularAdapter._parse_title_(test_raw_task)
+            print(f"{test_title=}, {test_jira=}, {test_spec=}")
 
         case other:
             pass

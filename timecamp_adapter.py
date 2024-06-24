@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import re
 import sys
-
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from typing import Tuple
 
-from adapter import BackendAdapter, GenericEntry, GenericTask, ParseError
+from adapter import BackendAdapter, BackendDataError, GenericEntry, GenericTask
 from api import BackendData
 from timecamp_api import TimecampEntry, TimecampTask
-from tools import Format
+from tools import CURRENT_TZ, Format
 
 
 # JIRA_REGEX = re.compile(r'\[([A-Z0-9]+-[0-9]+)\] ')
@@ -22,19 +21,17 @@ class TimecampAdapter(BackendAdapter):
         timecamp_task = TimecampTask(**raw_task)
         try:
             task_id: int = int(timecamp_task['task_id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Invalid task id '{task_id}'"
-            raise ParseError(error_msg.format(**timecamp_task))
+            raise BackendDataError(error_msg.format(**timecamp_task)) from cause
 
         try:
             parent_id: int = int(timecamp_task['parent_id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Task '{task_id}': Invalid parent id '{parent_id}'"
-            raise ParseError(error_msg.format(**timecamp_task))
+            raise BackendDataError(error_msg.format(**timecamp_task)) from cause
 
         title, jira = cls._parse_title_(timecamp_task)
-
-        # TODO: get spec from task tags
 
         return GenericTask(task_id, parent_id, title, jira, spec=None)
 
@@ -43,38 +40,38 @@ class TimecampAdapter(BackendAdapter):
         timecamp_entry = TimecampEntry(**raw_entry)
         try:
             entry_id: int = int(timecamp_entry['id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Invalid entry id '{id}'"
-            raise ParseError(error_msg.format(**timecamp_entry))
+            raise BackendDataError(error_msg.format(**timecamp_entry)) from cause
 
         try:
             task_id: int = int(timecamp_entry['task_id'])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as cause:
             error_msg = "Entry '{id}': Invalid task id '{task_id}'"
-            raise ParseError(error_msg.format(**timecamp_entry))
+            raise BackendDataError(error_msg.format(**timecamp_entry)) from cause
 
         try:
             day: date = date.fromisoformat(timecamp_entry['date'])
-        except ValueError:
+        except ValueError as cause:
             error_msg = "Entry '{id}': Invalid date format '{date}'"
-            raise ParseError(error_msg.format(**timecamp_entry))
+            raise BackendDataError(error_msg.format(**timecamp_entry)) from cause
 
         try:
             raw_start_time = timecamp_entry['start_time']
             start_time: time = datetime.strptime(raw_start_time, Format.HMS).time()
-        except ValueError:
+        except ValueError as cause:
             error_msg = "Entry '{id}': Invalid start time format '{start_time}'"
-            raise ParseError(error_msg.format(**timecamp_entry))
+            raise BackendDataError(error_msg.format(**timecamp_entry)) from cause
 
         try:
             raw_end_time = timecamp_entry['end_time']
             end_time: time = datetime.strptime(raw_end_time, Format.HMS).time()
-        except ValueError:
+        except ValueError as cause:
             error_msg = "Entry '{id}': Invalid end time format '{end_time}'"
-            raise ParseError(error_msg.format(**timecamp_entry))
+            raise BackendDataError(error_msg.format(**timecamp_entry)) from cause
 
-        start = datetime.combine(day, start_time).replace(tzinfo=timezone.utc).astimezone()
-        end = datetime.combine(day, end_time).replace(tzinfo=timezone.utc).astimezone()
+        start = datetime.combine(day, start_time, tzinfo=CURRENT_TZ)
+        end = datetime.combine(day, end_time, tzinfo=CURRENT_TZ)
 
         text = timecamp_entry['description']
 
@@ -88,17 +85,17 @@ class TimecampAdapter(BackendAdapter):
 
         if not match:
             error_msg = "Task '{task_id}': Invalid task name format: '{name}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise BackendDataError(error_msg.format(**raw_task))
 
         if match['title'] is None:
             error_msg = "Task '{task_id}': Missing task title: '{name}'"
-            raise ParseError(error_msg.format(**raw_task))
+            raise BackendDataError(error_msg.format(**raw_task))
 
         return match['title'], match['jira']
 
 
 if __name__ == '__main__':
-    # pyright: reportPrivateUsage=false
+    # pylint: disable=protected-access
 
     test_raw_entry = TimecampEntry(
         id=168460559,
@@ -120,16 +117,16 @@ if __name__ == '__main__':
 
     match sys.argv[1:]:
         case ['entry']:
-            entry = TimecampAdapter.parse_entry(test_raw_entry)
-            print(entry)
+            test_entry = TimecampAdapter.parse_entry(test_raw_entry)
+            print(test_entry)
 
         case ['task']:
-            task = TimecampAdapter.parse_task(test_raw_task)
-            print(task)
+            test_task = TimecampAdapter.parse_task(test_raw_task)
+            print(test_task)
 
         case ['title']:
-            title, jira = TimecampAdapter._parse_title_(test_raw_task)
-            print(f"{title=}, {jira=}")
+            test_title, test_jira = TimecampAdapter._parse_title_(test_raw_task)
+            print(f"{test_title=}, {test_jira=}")
 
         case other:
             pass

@@ -7,7 +7,7 @@ from api import BackendData
 from tools import AppError
 
 
-class ParseError(AppError):
+class BackendDataError(AppError):
     pass
 
 

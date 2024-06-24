@@ -167,3 +167,30 @@ ToDo:
 [ ] Reorganize the app to handle backend dep in the most organized way possible
 [ ] Rename `get_activities` to `get_tasks` and `Activities` to `Tasks`
 [ ] Put config to `.toml` file and use new Python module to parse it and wrap with `ConfigDict`
+[ ] Move Timecamp and Timeular -related stuff to separate subdirectories
+    (requires investigating running scripts via `python -m script.py`)
+[ ] Implement App.get(). Should do approximately the following:
+| def get(cls, start, end, validate=True):
+|     try:
+|         Task.load(validate)
+|         Entry.load(start, end, validate)
+|     except CacheMissError:
+|         Server.login(CONFIG.credentials[CONFIG.backend])
+|         Task.fetch(validate)
+|         Entry.fetch(start, end, validate)
+|         Server.logout()
+[x] [Node] [Taskname] does not work for tasks with spaces
+    Overall, will be better to specify jiraID here as well
+[ ] Implement scripting mode (commands are `eval`ed)
+[ ] Warn if span == 0 after going through `time_bounds`
+[ ] Add undo functionality
+[ ] Resolve HTML sequences from TimeCamp like &gt;
+[ ] Command to create new entry
+[ ] If duration of item is < 5m, it should be removed
+[ ] Command to display time tracking statistics from Jira for tasks in current working set + their parents
+[ ] Add command or similar that will move some part of one entry to another entry: `N1 | 20m > N2`
+[ ] Automatic time logging of meetings and calls
+[ ] Make `Server` and `Jira` classes a contextmanager
+[ ] Automatic Sprint meetings numbering
+[ ] Learn about Python protocols and use them in `ConfigLoader`
+[ ] Make `Backend` class in 'api.py' generic with `TypeVar`s: `BackendTask`, `BackendEntry`

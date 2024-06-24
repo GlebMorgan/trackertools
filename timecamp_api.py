@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-
 from datetime import date
 from operator import itemgetter
 from typing import List, Mapping, Sequence, TypedDict, cast
@@ -31,7 +30,7 @@ class TimecampEntry(TypedDict):
 class Timecamp(Backend):
     """Timecamp API docs: https://developer.timecamp.com"""
 
-    api = 'https://app.timecamp.com/third_party/api'
+    API = 'https://app.timecamp.com/third_party/api'
 
     @classmethod
     def login(cls, credentials: Credentials):
@@ -65,20 +64,32 @@ class Timecamp(Backend):
 
 
 if __name__ == '__main__':
+
+    def test_tasks():
+        Timecamp.login({'key': CONFIG.credentials.timecamp.key})
+        response = Timecamp.get_tasks()
+        print(f"Response: {type(response)}")
+        print(response)
+        Timecamp.logout()
+
+    def test_entries():
+        Timecamp.login({'key': CONFIG.credentials.timecamp.key})
+        response = Timecamp.get_entries(start=date(2023, 1, 1), end=date(2024, 6, 3))
+        print(f"Response: {type(response)}")
+
+        # pylint: disable=import-outside-toplevel
+        import json
+
+        with open("entries_log.json", mode='w', encoding='utf-8') as file:
+            json.dump(response, file)
+        Timecamp.logout()
+
     match sys.argv[1:]:
         case ['tasks']:
-            Timecamp.login({'key': CONFIG.api.timecamp.key})
-            response = Timecamp.get_tasks()
-            print(f"Response: {type(response)}")
-            print(response)
-            Timecamp.logout()
+            test_tasks()
 
         case ['entries']:
-            Timecamp.login({'key': CONFIG.api.timecamp.key})
-            response = Timecamp.get_entries(start=date(2023, 2, 27), end=date(2023, 3, 2))
-            print(f"Response: {type(response)}")
-            print(response)
-            Timecamp.logout()
+            test_entries()
 
         case other:
             pass

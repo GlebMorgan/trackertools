@@ -1,0 +1,22 @@
+{
+    "/fleet/tms/teltonika-tdf": "TDF",
+    "/fleet/tms/apps/telematics-app": "TAPP",
+    "/fleet/tms/apps/daughterboard-application": "DAPP",
+    "/fleet/tms/apps/extension-application": "EXTAPP",
+    "/fleet/tms/apps/ble-extension-application": "BLEAPP",
+    "/fleet/tms/apps/can-extension-application": "CANAPP",
+    "/fleet/tms/apps/teltonika-bootloader": "TBL",
+    "/fleet/tms/tools/tms-python-console": "TMS-Console",
+    "/fleet/tms/libraries/protobuf-communication": "TAPP-Proto",
+    "/fleet/tms/libraries/extapp-protobuf-communication": "EXTMCU-Proto",
+    "/fleet/tms/libraries/extmcu-protobuf-communication": "EXTMCU-Proto",
+    "/fleet/tms/tools/ag3335-airoha-logging-tool-src": "Airoha-Logging-Tool",
+    "/fleet/tms/tools/gitlab-roulette": "GitLab-Roulette",
+    "/fleet/fmb/fmb-firmware": "FMB",
+    "/fleet/fmb6/fmb6-firmware": "FMB6",
+    "/fleet/fmb/tetra-protocol": "TETRA",
+    "/dotnet/confi/tct": "TCT",
+    "/fleet/fmb/fmb-configurator": "CONF",
+    "/fleet/fmb/cfg-configurations": "CFG",
+    "/fleet/fmb/cfg-localization": "LOC"
+}

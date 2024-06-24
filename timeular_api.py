@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-
 from datetime import date, datetime, time
 from typing import Mapping, Sequence, Tuple, TypedDict
 
@@ -51,7 +50,7 @@ class TimeularEntry(TypedDict):
 class Timeular(Backend):
     """Timeular API docs: https://developers.timeular.com"""
 
-    api = 'https://api.timeular.com/api/v3'
+    API = 'https://api.timeular.com/api/v3'
 
     @classmethod
     def login(cls, credentials: Credentials):
@@ -121,25 +120,32 @@ class Timeular(Backend):
 
 
 if __name__ == '__main__':
-    credentials = Credentials(
-        key=CONFIG.api.timeular.key,
-        secret=CONFIG.api.timeular.secret,
+
+    def test_tasks():
+        Timeular.login(api_credentials)
+        response = Timeular.get_tasks()
+        print(f"Response: {type(response)}")
+        print(response)
+        Timeular.logout()
+
+    def test_entries():
+        Timeular.login(api_credentials)
+        response = Timeular.get_entries(start=date(2023, 1, 23), end=date(2023, 1, 25))
+        print(f"Response: {type(response)}")
+        print(response)
+        Timeular.logout()
+
+    api_credentials = Credentials(
+        key=CONFIG.credentials.timeular.key,
+        secret=CONFIG.credentials.timeular.secret,
     )
 
     match sys.argv[1:]:
         case ['tasks']:
-            Timeular.login(credentials)
-            response = Timeular.get_tasks()
-            print(f"Response: {type(response)}")
-            print(response)
-            Timeular.logout()
+            test_tasks()
 
         case ['entries']:
-            Timeular.login(credentials)
-            response = Timeular.get_entries(start=date(2023, 1, 23), end=date(2023, 1, 25))
-            print(f"Response: {type(response)}")
-            print(response)
-            Timeular.logout()
+            test_entries()
 
-        case other:
+        case _:
             pass
