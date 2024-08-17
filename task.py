@@ -59,31 +59,27 @@ class Task:
     @classmethod
     def fetch(cls, validate: bool = True):
         """Download tasks from server, store them to cache and load into application"""
-
         trace("Fetching tasks...")
         raw_tasks: Sequence[BackendData] = Server.get_tasks()
         CacheManager.save(raw_tasks)
-
-        cls.all.clear()
-        for raw_task in raw_tasks:
-            generic_task: GenericTask = Adapter.parse_task(raw_task)
-            task: Task = cls.gen(generic_task)
-            if validate is True:
-                task.check_health()
+        cls._reload_(raw_tasks, check_health=validate)
 
     @classmethod
     def load(cls, validate: bool = True):
         """Load tasks from cache into application"""
         raw_tasks: Sequence[BackendData] = CacheManager.load_tasks()
+        cls._reload_(raw_tasks, check_health=validate)
 
+    @classmethod
+    def _reload_(cls, raw_tasks: Sequence[BackendData], *, check_health: bool):
         cls.all.clear()
         for raw_task in raw_tasks:
             generic_task: GenericTask = Adapter.parse_task(raw_task)
             task: Task = cls.gen(generic_task)
-            if validate is True:
-                task.check_health()
+            if check_health is True:
+                task._check_health_()
 
-    def check_health(self) -> bool:
+    def _check_health_(self) -> bool:
         healthy: bool = True
 
         if not self.name:

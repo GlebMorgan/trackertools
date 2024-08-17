@@ -13,10 +13,10 @@ from alias import Alias
 from api import BackendData
 from cache import CacheManager
 from config import CONFIG, trace
-from jira_formatter import JiraFormatter
 from jira_client import Jira
+from jira_formatter import JiraFormatter
 from task import Task
-from tools import TODAY, first_word, round_bounds, timespan_to_duration
+from tools import TODAY, Format, first_word, round_bounds, timespan_to_duration
 
 
 match CONFIG.backend:
@@ -84,32 +84,13 @@ class Entry:
         trace(f"Fetching entries for {(until-since).days} days...")
         raw_entries: Sequence[BackendData] = Server.get_entries(since, until)
         CacheManager.save(raw_entries)
-
-        cls.all.clear()
-        for raw_entry in raw_entries:
-            generic_entry: GenericEntry = Adapter.parse_entry(raw_entry)
-
-            if generic_entry.task == 0:
-                # Drop entries without a task silently
-                # This can happen with Timecamp, when entry is created accidentally
-                continue
-
-            entry: Entry = cls.gen(generic_entry)
-            if validate is True:
-                entry.check_health()
+        cls._reload_(raw_entries, check_health=validate)
 
     @classmethod
     def load(cls, since: date, until: date, validate: bool = True):
         """Load entries from cache into application"""
         raw_entries: Sequence[BackendData] = CacheManager.load_entries(since, until)
-
-        cls.all.clear()
-        for raw_entry in raw_entries:
-            generic_entry: GenericEntry = Adapter.parse_entry(raw_entry)
-            if cls._within_dates_(generic_entry.start, generic_entry.end, since, until):
-                entry: Entry = cls.gen(generic_entry)
-                if validate is True:
-                    entry.check_health()
+        cls._reload_(raw_entries, check_health=validate)
 
     @classmethod
     def combine(cls, entries: Iterable[Entry]) -> int:
@@ -149,7 +130,25 @@ class Entry:
     def delete(self):
         del self.__class__.all[self.alias]
 
-    def check_health(self) -> bool:
+    @classmethod
+    def _reload_(cls, raw_entries: Sequence[BackendData], *, check_health: bool):
+        cls.all.clear()
+        for raw_entry in raw_entries:
+            generic_entry: GenericEntry = Adapter.parse_entry(raw_entry)
+
+            if generic_entry.task == 0:
+                # Drop entries without a task silently
+                # This can happen with Timecamp, when entry is created accidentally
+                # TODO: Consider moving this to _check_health_() + make sure gen() is happy
+                print(f"[WARNING] Entry at {generic_entry.start:{Format.WHM}} has no task")
+                continue
+
+            entry: Entry = cls.gen(generic_entry)
+
+            if check_health is True:
+                entry._check_health_()
+
+    def _check_health_(self) -> bool:
         healthy: bool = True
         if not self.text and self.task.name not in CONFIG.tasks:
             print(f"[WARNING] Entry '{self}' has no description")
@@ -237,10 +236,6 @@ class Entry:
         if alias in self.all.keys():
             return self._gen_alias_(seed + 1)
         return alias
-
-    @staticmethod
-    def _within_dates_(start: datetime, end: datetime, first: date, last: date) -> bool:
-        return first <= start.date() <= last or first <= end.date() <= last
 
     @staticmethod
     def _grouping_order_(entry: Entry) -> tuple[date, int, str]:

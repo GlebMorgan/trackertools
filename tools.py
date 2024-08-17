@@ -21,6 +21,7 @@ class Format:
     YMD = '%Y-%m-%d'
     YMDHM = '%Y-%m-%d %H:%M'
     YMDHMS = '%Y-%m-%d %H:%M:%S'
+    WHM = '%a %H:%M'
 
 
 class AttrDict(dict[str, Any]):
