@@ -131,7 +131,62 @@ Utils:
 
 
 
+Jira timetracking:
+• Estimated = `issue.fields.timeoriginalestimate`
+• Remaining = `issue.fields.timeestimate`
+• Logged = `issue.fields.timespent`
+
+
+
+Temp:
+• List of numbers regex: `(((\d+(\.\d+)?)|-)(, )?)+`
+
+
+
 ToDo:
+[ ] CRITICAL: Sort items by time
+[ ] HIGH: Save working entry list to a cache and load back (`.save()` and `.restore()` functions)
+[ ] HIGH: Command `[Node] restore` for mistakenly removed nodes
+[ ] HIGH: Command to create new entry
+[ ] MID: Commands `show next` and `show prev` (days)
+[ ] MID: Move Timecamp and Timeular -related stuff to separate subdirectories
+    (requires investigating running scripts via `python -m script.py`)
+[ ] MID: Warn if span == 0 after going through `time_bounds`
+[ ] MID: Resolve HTML sequences from TimeCamp like &gt;
+[ ] MID: Add command or similar that will move some part of one entry to another entry: `N1 | 20m > N2`
+[ ] MID: `requests.exceptions.ConnectionError` handling at each `.login()` and `cls._session_.get()`
+[ ] LOW: Implement all "Not implemented" commands
+[ ] LOW: Use logging module for debug prints
+[ ] LOW: Make sure that all the deps come only top-to-bottom (i.e. that no lower-level module imports 'app.py')
+[ ] LOW: Remove or add dots in descriptions consistently
+[ ] CONSIDER: Ping Jira before trying to login to allow for partial functionality without VPN
+[ ] CONSIDER: Extract all fetching and caching functionality from `entry.py` to `entry-loader.py`
+[ ] CONSIDER: Think about joining `[Week]` and `[Date]..[Date]` into a single Token`
+[ ] CONSIDER: Remove `CONFIG` dependencies from all files except for 'app.py'
+    Inject dependencies to classes directly (i.e. `Jira`, `Entry`, `Task`, etc.)
+[ ] CONSIDER: Reorganize the app to handle backend dep in the most organized way possible
+[ ] CONSIDER: Implement `App.get()`, should do approximately the following:
+| def get(cls, start, end, validate=True):
+|     try:
+|         Task.load(validate)
+|         Entry.load(start, end, validate)
+|     except CacheMissError:
+|         Server.login(CONFIG.credentials[CONFIG.backend])
+|         Task.fetch(validate)
+|         Entry.fetch(start, end, validate)
+|         Server.logout()
+[ ] CONSIDER: Implement scripting mode (commands are `eval`ed)
+[ ] CONSIDER: Make `Server` and `Jira` classes a contextmanager
+[ ] CONSIDER: Learn about Python protocols and use them in `ConfigLoader`
+[ ] CONSIDER: Make `Backend` class in 'api.py' generic with `TypeVar`s: `BackendTask`, `BackendEntry`
+[ ] CONSIDER: Add `.reload()` method to `ConfigDict` to fetch updates from source file
+[ ] IDEA: Output time intervals for RND for Igoris to quickly correct:
+    • Start of work – start of lunch break
+    • End of lunch break – end of work
+[ ] IDEA: Add undo functionality
+[ ] IDEA: Automatic time logging of meetings and calls
+[ ] NONE: Put config to `.toml` file and use `ConfigLoader` to parse it and wrap with `ConfigDict`
+
 [x] Make spaces between command token and command syntax literal optional
 [x] Add `Nd` format to `Span` token (does not combine with `Xh` and `Xm`, just for moving between days)
 [x] Only 1 space between Jira ID and Activity name
@@ -145,52 +200,20 @@ ToDo:
 [x] Add `combine [Date]`, `combine [Week]` and `combine [Date]..[Date]` commands
 [-] When parsing using tokens, add '\b' to the start and end of every regex string
 [-] Add support for plain regexes in `Command` pattern (like r'/.*/' for arbitrary text and so on)
-[ ] Commands `show next` and `show prev` (days)
-[ ] Think about joining `[Week]` and `[Date]..[Date]` into a single Token`
-[ ] Save working entry list to a separate cache and load back (`.save()` and `.restore()` functions)
-[ ] On unhandled error, save entries to working cache
-[ ] Implement all "Not implemented" commands
-[ ] Command `+ [Node]` for mistakenly removed nodes
-[ ] Use logging module for debug prints
-[ ] Extract all fetching and caching functionality from `entry.py` to `entry-loader.py`
-[ ] Convert `config.py` to TOML, YAML or custom format
-[ ] Output time intervals for RND for Igoris to quickly correct:
-    • Start of work – start of lunch break
-    • End of lunch break – end of work
-[ ] Convert common MD-style formatting to Jira-style formatting
-    • `code` to {{_code_}}
-    • etc.
-[ ] Check the first work in time entry description not ending with 'ing'
-    If it does, suggest to auto-remove it or rewrite the whole first word using imperative form
-[ ] Remove `CONFIG` dependencies from all files except for 'app.py'
-[ ] Make sure that all the deps come only top-to-bottom (i.e. that no lower-level module imports 'app.py')
-[ ] Reorganize the app to handle backend dep in the most organized way possible
-[ ] Rename `get_activities` to `get_tasks` and `Activities` to `Tasks`
-[ ] Put config to `.toml` file and use new Python module to parse it and wrap with `ConfigDict`
-[ ] Move Timecamp and Timeular -related stuff to separate subdirectories
-    (requires investigating running scripts via `python -m script.py`)
-[ ] Implement App.get(). Should do approximately the following:
-| def get(cls, start, end, validate=True):
-|     try:
-|         Task.load(validate)
-|         Entry.load(start, end, validate)
-|     except CacheMissError:
-|         Server.login(CONFIG.credentials[CONFIG.backend])
-|         Task.fetch(validate)
-|         Entry.fetch(start, end, validate)
-|         Server.logout()
-[x] [Node] [Taskname] does not work for tasks with spaces
+[-] On unhandled error, save entries to working cache
+    ╰─► Resolved in a different way, just catch all exceptions in `App`
+[x] Convert common MD-style formatting to Jira-style formatting (`code` to {{code}}, etc.)
+[x] Check the first work in time entry description not ending with 'ing'
+    If it does, suggest to use imperative form
+[x] Rename `get_activities` to `get_tasks` and `Activities` to `Tasks`
+[x] `[Node] [Taskname]` does not work for tasks with spaces
     Overall, will be better to specify jiraID here as well
-[ ] Implement scripting mode (commands are `eval`ed)
-[ ] Warn if span == 0 after going through `time_bounds`
-[ ] Add undo functionality
-[ ] Resolve HTML sequences from TimeCamp like &gt;
-[ ] Command to create new entry
-[ ] If duration of item is < 5m, it should be removed
-[ ] Command to display time tracking statistics from Jira for tasks in current working set + their parents
-[ ] Add command or similar that will move some part of one entry to another entry: `N1 | 20m > N2`
-[ ] Automatic time logging of meetings and calls
-[ ] Make `Server` and `Jira` classes a contextmanager
-[ ] Automatic Sprint meetings numbering
-[ ] Learn about Python protocols and use them in `ConfigLoader`
-[ ] Make `Backend` class in 'api.py' generic with `TypeVar`s: `BackendTask`, `BackendEntry`
+    ╰─► Added `JiraID` token, removed `Taskname`
+[-] LOW: If duration of item is < 5m, it should be removed
+    ╰─► Won't do, this is not undesirable and will just loose a bit of time logged
+        And `combine` command merges all small entries automatically in most cases anyway
+[x] HIGH: Command to display time tracking statistics from Jira for tasks in current working set + their parents
+    ╰─► Time tracking info from Jira added, not sure what is "their parents"
+[-] LOW: Automatic Sprint meetings numbering
+    ╰─► Won't use numbering, no reason
+[x] MID: Add formatter for replacing symbols like `--`

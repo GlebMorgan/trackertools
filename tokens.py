@@ -6,7 +6,8 @@ from re import Match, Pattern
 from re import compile as compile_regex
 from typing import Any, ClassVar, List, NoReturn, Tuple
 
-from entry import Alias, Entry
+from alias import Alias
+from entry import Entry
 from task import Task
 from tools import TODAY, AppError, Format
 
@@ -139,9 +140,9 @@ class Date(Token):
 
 class Week(Token):
     formatspec = genspec(
+        week=r'week[- ](\d+)',
         thisweek=r'week',
         lastweek=r'last[- ]week',
-        week=r'week[- ](\d)',
     )
 
     @staticmethod
@@ -256,7 +257,10 @@ class Num(Token):
 
 
 class Toggle(Token):
-    formatspec = genspec(on=r'1|ON|YES|Y|TRUE', off=r'0|OFF|NO|N|FALSE')
+    formatspec = genspec(
+        on=r'1|ON|YES|Y|TRUE',
+        off=r'0|OFF|NO|N|FALSE',
+    )
 
     def evaluate(self) -> bool:
         assert self.match is not None
@@ -275,3 +279,32 @@ class Quit(Token):
     formatspec = genspec(
         get=r'x|q|exit|quit',
     )
+
+
+class TimeList(Token):
+    formatspec = genspec(
+        list=r'(((\d+(:\d+)?)|-)(, )?)+',
+    )
+
+    def parse_time(self, hour_min_time: str) -> timedelta | None:
+        if hour_min_time == '-':
+            return None
+        components = hour_min_time.split(':')
+        if len(components) == 1:
+            return timedelta(hours=int(components[0]))
+        if len(components) == 2:
+            hours, minutes = components
+            return timedelta(hours=int(hours), minutes=int(minutes))
+        raise ParseError(f"Invalid time format: {time}")
+
+    def evaluate(self) -> List[timedelta | None]:
+        assert self.match is not None
+        assert self.format is not None
+
+        match self.format:
+            case 'list':
+                items = filter(None, self.match[0].split(', '))
+                return [self.parse_time(item) for item in items]
+
+            case unknown:
+                self.handle_unknown_format(unknown)

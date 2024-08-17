@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import random
 import re
-import string
 import sys
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from itertools import count as counter
 from itertools import groupby
-from typing import Callable, ClassVar, Dict, Iterable, List, NewType, Sequence, Tuple
+from typing import Callable, ClassVar, Iterable, NewType, Self, Sequence
 
 from adapter import GenericEntry
+from alias import Alias
 from api import BackendData
 from cache import CacheManager
 from config import CONFIG, trace
 from jira_formatter import JiraFormatter
+from jira_client import Jira
 from task import Task
 from tools import TODAY, first_word, round_bounds, timespan_to_duration
 
@@ -29,13 +30,13 @@ match CONFIG.backend:
         raise ImportError(f"Invalid backend config: '{other}'")
 
 
-Alias = NewType("Alias", str)
+EntryId = NewType("EntryId", int)
 
 
 @dataclass(slots=True)
 class Entry:
-
     alias: Alias = field(init=False, compare=False)
+    id: EntryId = field(compare=False)
     task: Task
     start: datetime
     end: datetime
@@ -43,7 +44,7 @@ class Entry:
     markup: str | None = None
     worklog_id: int = 0
 
-    all: ClassVar[Dict[Alias, Entry]] = {}
+    all: ClassVar[dict[Alias, Entry]] = {}
     formatter: ClassVar[JiraFormatter] = JiraFormatter()
 
     @property
@@ -58,6 +59,11 @@ class Entry:
     def duration(self) -> str:
         return timespan_to_duration(self.span)
 
+    @property
+    def description(self) -> str:
+        description = self.markup if self.markup is not None else self.text
+        return ' | '.join(description.splitlines())
+
     @classmethod
     def gen(cls, generic_entry: GenericEntry) -> Entry:
         task_id: int = generic_entry.task
@@ -66,9 +72,10 @@ class Entry:
         start, end = round_bounds(generic_entry.start, generic_entry.end)
         assert start <= end
 
+        entry_id: int = generic_entry.id
         text: str = generic_entry.description
 
-        return cls(Task.all[task_id], start, end, text)
+        return cls(EntryId(entry_id), Task.all[task_id], start, end, text)
 
     @classmethod
     def fetch(cls, since: date, until: date, validate: bool = True):
@@ -108,9 +115,9 @@ class Entry:
     def combine(cls, entries: Iterable[Entry]) -> int:
         deleted = 0
 
-        sorted_entries: List[Entry] = sorted(entries, key=cls._grouping_order_)
+        sorted_entries: list[Entry] = sorted(entries, key=cls._grouping_order_)
         for key, group in groupby(sorted_entries, key=cls._grouping_order_):
-            fragments: List[Entry] = sorted(group, key=lambda e: e.start)
+            fragments: list[Entry] = sorted(group, key=lambda e: e.start)
             total_duration: timedelta = sum((e.span for e in fragments), start=timedelta())
             composite_entry = fragments[0]
             composite_entry.end = composite_entry.start + total_duration
@@ -124,6 +131,14 @@ class Entry:
     def combine_for(cls, since: date, until: date) -> int:
         range_filter: Callable[[Entry], bool] = lambda e: since <= e.start.date() <= until
         return cls.combine(filter(range_filter, Entry.all.values()))
+
+    @classmethod
+    def all_tasks(cls) -> list[Task]:
+        tasks: list[Task] = []
+        for entry in cls.all.values():
+            if all(task.jira != entry.task.jira for task in tasks):
+                tasks.append(entry.task)
+        return tasks
 
     def logged(self) -> bool:
         return self.worklog_id != 0
@@ -145,11 +160,8 @@ class Entry:
         if self.start.date() != self.end.date():
             print(f"[WARNING] Entry '{self}' spans across multiple days")
             healthy = False
-        if first_word(self.text).endswith('ing'):
+        if any(first_word(line).endswith('ing') for line in self.text.splitlines()):
             print(f"[WARNING] Entry '{self}' description is not imperative")
-            healthy = False
-        if self.task.name.startswith("Sprint") and not self.text:
-            print(f"[WARNING] Entry '{self}' is missing sprint number")
             healthy = False
         if self.task.name == "MR" and not self.text:
             print(f"[WARNING] Entry '{self}' is missing MR link")
@@ -163,12 +175,50 @@ class Entry:
             return True
         return False
 
+    @classmethod
+    def gen_id(cls, reference: Self) -> EntryId:
+        for i in counter(1):
+            new_id = EntryId(reference.id + i)
+            if all(entry.id != new_id for entry in cls.all.values()):
+                return new_id
+        return EntryId(reference.id)
+
     def gen_markup(self) -> bool:
         self.markup = self.formatter.format(self.task, self.text)
-        return True if self.markup else False
+        return bool(self.markup)
+
+    def log_to_jira(self) -> bool:
+        if self.task.jira is None:
+            print(f"[ERROR] Entry '{self}' has no Jira task")
+            return False
+
+        if self.markup is None:
+            print(f"[ERROR] Entry '{self}' is not formatted")
+            return False
+
+        worklog = Jira.add_worklog(self.task.jira, self.duration, self.start, self.markup)
+
+        if worklog is None:
+            return False
+
+        self.worklog_id = worklog.id
+        return True
+
+    def remove_jira_log(self) -> bool:
+        if self.task.jira is None:
+            print(f"[ERROR] Entry '{self}' has no Jira task")
+            return False
+
+        if self.logged() is False:
+            return False
+
+        Jira.delete_worklog(self.task.jira, self.worklog_id)
+
+        self.worklog_id = 0
+        return True
 
     def __post_init__(self):
-        self.alias = Alias(self._gen_alias_())
+        self.alias = self._gen_alias_()
         self.__class__.all[self.alias] = self
 
     def __str__(self):
@@ -181,19 +231,19 @@ class Entry:
         start_time = f"{self.start.hour:02}:{self.start.minute:02}"
         return f"{self.alias}: {task} ({self.day} {start_time} {self.duration})"
 
-    @classmethod
-    def _gen_alias_(cls):
-        while True:
-            alias = str().join(random.choice(string.ascii_uppercase) for char in 'XX')
-            if alias not in cls.all.keys():
-                return alias
+    def _gen_alias_(self, entry_id: int | None = None) -> Alias:
+        seed = entry_id or self.id
+        alias = Alias.gen(seed)
+        if alias in self.all.keys():
+            return self._gen_alias_(seed + 1)
+        return alias
 
     @staticmethod
     def _within_dates_(start: datetime, end: datetime, first: date, last: date) -> bool:
         return first <= start.date() <= last or first <= end.date() <= last
 
     @staticmethod
-    def _grouping_order_(entry: Entry) -> Tuple[date, int, str]:
+    def _grouping_order_(entry: Entry) -> tuple[date, int, str]:
         return (entry.start.date(), entry.task.id, entry.text)
 
 

@@ -10,8 +10,9 @@ from typing import Callable, ClassVar, Collection, Dict, List, Tuple
 
 from config import CONFIG
 from entry import Entry
-from task import Task
-from tools import TODAY, constrict, timespan_to_duration
+from jira_client import Jira
+from task import JiraId, Task
+from tools import TODAY, AppError, constrict, seconds_to_duration, timespan_to_duration
 
 
 TOP_SCROLL_SEQUENCE = "\033[H\033[J"
@@ -20,7 +21,9 @@ GAP = 3
 
 class Table:
     widths: ClassVar[Dict[str, int]] = defaultdict(int)
+    scrollback: ClassVar[bool] = CONFIG.scrollback
     stored_interval: ClassVar[tuple[date, date] | None] = None
+    targets: ClassVar[List[timedelta | None]] = []
 
     @staticmethod
     def _display_order_(entry: Entry) -> Tuple[int, date]:
@@ -39,7 +42,7 @@ class Table:
         return '·'
 
     @classmethod
-    def _update_column_widths_(cls):
+    def _set_column_widths_(cls):
         cls.widths.clear()
         for entry in Entry.all.values():
             if (jira_width := len(str(entry.task.jira))) > cls.widths['jira']:
@@ -50,9 +53,8 @@ class Table:
     @classmethod
     def _trunc_description_(cls, description: str) -> str:
         console_width = os.get_terminal_size().columns
-        max_width = console_width - cls.widths['jira'] - GAP - cls.widths['task'] - GAP - 30
-        output = ' | '.join(description.splitlines())
-        return constrict(output, max_width)
+        max_width = console_width - cls.widths['jira'] - GAP - cls.widths['task'] - 38
+        return constrict(description, width=max_width)
 
     @classmethod
     def list(cls, entries: List[Entry]):
@@ -62,44 +64,59 @@ class Table:
                 print(entry)
 
     @classmethod
-    def format_row(cls, i: int, entry: Entry) -> str:
+    def format_row(cls, entry: Entry) -> str:
         status = cls._get_status_glyph_(entry)
-        description = entry.markup if entry.formatted() else entry.text
         return (
             f"{status} {entry.alias :{2 + GAP}}"
             f"{entry.start.strftime('%H:%M') :{5 + GAP}}"
             f"{entry.duration :{6 + GAP}}"
+            f"{cls._align_negative_time_(cls._format_time_remaining_(entry)) :{8 + GAP}}"
             f"{entry.task.jira or '-' :<{cls.widths['jira'] + GAP}}"
             f"{entry.task.name :<{cls.widths['task'] + GAP}}"
-            f"{cls._trunc_description_(str(description))}"
+            f"{cls._trunc_description_(entry.description)}"
         )
 
     @classmethod
-    def display_grouped(cls, entries: Collection[Entry]):
-        cls._update_column_widths_()
+    def group_by_days(cls, entries: Collection[Entry]) -> Dict[date, List[Entry]]:
         entries_grouped: Dict[date, List[Entry]] = defaultdict(list)
-
-        total_duration = timedelta()
         for entry in entries:
             entries_list = entries_grouped[entry.start.date()]
             insort(entries_list, entry, key=cls._display_order_)
-            total_duration += entry.span
+        return entries_grouped
 
-        if CONFIG.scrollback is False:
+    @classmethod
+    def get_total_duration(cls, entries: Collection[Entry]) -> timedelta:
+        return sum((entry.span for entry in entries), start=timedelta())
+
+    @classmethod
+    def display_grouped(cls, entries: Collection[Entry]):
+        Jira.login(CONFIG.credentials.jira.token)
+
+        cls._set_column_widths_()
+
+        if cls.scrollback is False:
             print(TOP_SCROLL_SEQUENCE, end="")
 
-        index = 0
+        total_duration = cls.get_total_duration(entries)
+        entries_grouped = cls.group_by_days(entries)
+
         print(f"Total - {len(entries)} entries - {timespan_to_duration(total_duration)}")
-        for curr_date, daily_entries in sorted(entries_grouped.items()):
+        for i, (curr_date, daily_entries) in enumerate(sorted(entries_grouped.items())):
             daily_total = sum((entry.span for entry in daily_entries), start=timedelta())
             daily_duration = timespan_to_duration(daily_total)
-            print(
+            daily_header = (
                 f"\n{curr_date:%A} {curr_date}"
                 f" - {len(daily_entries)} entries"
                 f" - {daily_duration}"
             )
-            for index, entry in enumerate(daily_entries, start=index + 1):
-                print(cls.format_row(index, entry))
+            if len(cls.targets) > i:
+                target_duration = cls.targets[i]  # make it explicit for PyLance
+                if target_duration is not None:
+                    daily_header += f" ({timespan_to_duration(target_duration)} target)"
+
+            print(daily_header)
+            for entry in daily_entries:
+                print(cls.format_row(entry))
 
     @classmethod
     def display_all(cls):
@@ -116,6 +133,78 @@ class Table:
     def display_latest(cls):
         if cls.stored_interval is not None:
             cls.display_for(*cls.stored_interval)
+
+    @classmethod
+    def display_task_estimations(cls):
+        tasks = [task for task in Entry.all_tasks() if task.name not in CONFIG.tasks]
+        max_task_name = max(len(task.name) for task in tasks)
+
+        print(
+            "Task name".ljust(max_task_name),
+            "Jira".ljust(12),
+            "Estimate".ljust(12),
+            "Remaining".ljust(12),
+            "Spent".ljust(12),
+            sep=' ' * GAP,
+        )
+
+        for task in tasks:
+            tracking = Jira.get_timetracking(task.jira)
+            if tracking is None:
+                continue
+
+            logged = sum(
+                int(entry.span.total_seconds())
+                for entry in Entry.all.values()
+                if entry.task.jira == task.jira
+            )
+
+            print(
+                f"{task.name:{max_task_name}}",
+                f"{task.jira :12}",
+                f"{seconds_to_duration(tracking.estimated):12}",
+                f"{seconds_to_duration(tracking.remaining):12}",
+                f"{seconds_to_duration(logged):12}",
+                sep=' ' * GAP,
+            )
+
+    @classmethod
+    def _get_time_spent_(cls, jira_id: JiraId) -> timedelta:
+        spent = sum(
+            int(entry.span.total_seconds())
+            for entry in Entry.all.values()
+            if entry.task.jira == jira_id
+        )
+        return timedelta(seconds=spent)
+
+    @classmethod
+    def _format_time_remaining_(cls, entry: Entry) -> str:
+        if entry.task.jira is None:
+            return "-"
+
+        if entry.task.name in CONFIG.tasks:
+            return ""
+
+        tracking = Jira.get_timetracking(entry.task.jira)
+        if tracking is None:
+            raise AppError(f"Failed to get time tracking for {entry.task.jira}")
+
+        if tracking.estimated == 0:
+            return "N/A"
+
+        spent = cls._get_time_spent_(entry.task.jira)
+        remaining = tracking.remaining - int(spent.total_seconds())
+        return seconds_to_duration(remaining)
+
+    @staticmethod
+    def _align_negative_time_(string: str) -> str:
+        if string.startswith("-") and string != "-":
+            return string
+        return f" {string}"
+
+    @classmethod
+    def set_daily_targets(cls, target_durations: List[timedelta | None]):
+        cls.targets = target_durations
 
 
 if __name__ == '__main__':

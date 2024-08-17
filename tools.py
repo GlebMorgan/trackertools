@@ -97,20 +97,32 @@ def round_bounds(start: datetime, end: datetime, to: int = 5) -> Tuple[datetime,
     )
 
 
+def seconds_to_duration(total_seconds: int) -> str:
+    """Convert seconds to string of hour-minute format: '##h ##m'"""
+    if total_seconds == 0:
+        return "0m"
+
+    minutes, seconds = divmod(abs(total_seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+
+    components = {"h": hours, "m": minutes}
+    string = ' '.join(str(value) + marker for marker, value in components.items() if value)
+
+    if total_seconds < 0:
+        string = '-' + string
+    return string
+
+
 def timespan_to_duration(timespan: timedelta) -> str:
-    """Convert `timedelta` object to string of hour-minute format: 'Xh Ym'"""
-    seconds = int(timespan.total_seconds())
-    hours = seconds // 60 // 60
-    minutes = (seconds // 60) % 60
-    components = dict(h=hours, m=minutes)
-    return ' '.join(str(value) + marker for marker, value in components.items() if value)
+    """Convert `timedelta` object to string of hour-minute format: '##h ##m'"""
+    return seconds_to_duration(int(timespan.total_seconds()))
 
 
 def date_range(start: date, end: date) -> Iterable[date]:
     return (start + timedelta(days=x) for x in range((end - start).days + 1))
 
 
-def constrict(string: str, width: int) -> str:
+def constrict(string: str, *, width: int) -> str:
     if len(string) > width:
         string = string[: width - 3] + '...'
     return string

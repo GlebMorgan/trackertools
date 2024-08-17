@@ -8,6 +8,7 @@ from adapter import BackendDataError, GenericTask
 from api import BackendData
 from cache import CacheManager
 from config import CONFIG, trace
+from jira_client import Jira, TimeEstimate
 
 
 match CONFIG.backend:
@@ -22,19 +23,25 @@ match CONFIG.backend:
 
 
 TaskId = NewType("TaskId", int)
-Jira = NewType("Jira", str)
+JiraId = NewType("JiraId", str)
 Spec = NewType("Spec", str)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class Task:
     id: TaskId
     parent: Task | None
     name: str
-    jira: Jira | None
+    jira: JiraId | None
     spec: Spec | None
 
-    all: ClassVar[Dict[int, Task]] = {}
+    all: ClassVar[Dict[TaskId, Task]] = {}
+
+    @property
+    def timetracking(self) -> TimeEstimate | None:
+        if self.jira is None:
+            return None
+        return Jira.get_timetracking(self.jira)
 
     @classmethod
     def gen(cls, generic_task: GenericTask) -> Task:
@@ -116,14 +123,14 @@ class Task:
         raise BackendDataError(f"Task '{task.id}': invalid spec '{task.spec}'")
 
     @classmethod
-    def _parse_jira_(cls, task: GenericTask) -> Jira | None:
+    def _parse_jira_(cls, task: GenericTask) -> JiraId | None:
         if task.jira:
-            return Jira(task.jira)
+            return JiraId(task.jira)
 
         name = task.title.strip()
         if name in CONFIG.tasks:
             jira_id = CONFIG.tasks[name]
-            return Jira(jira_id) if jira_id else None
+            return JiraId(jira_id) if jira_id else None
 
         raise BackendDataError(
             f"Task '{task.id}': Invalid general task name '{task.title}'"

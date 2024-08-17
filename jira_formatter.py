@@ -40,6 +40,14 @@ class CodeMarkup(Markup, name='code'):
         return Markup.Result(output, substitutions)
 
 
+class HyphenMarkup(Markup, name='hyphen'):
+    pattern: ClassVar[Pattern[str]] = re.compile(r' -- ')
+
+    def apply(self, task: Task, text: str) -> Markup.Result:
+        output, substitutions = self.pattern.subn(r' – ', text)
+        return Markup.Result(output, substitutions)
+
+
 class URLMarkup(Markup, name='url'):
     pattern: ClassVar[Pattern[str]] = re.compile(r'\[(.*?)\]\((.*?)\)')
 
@@ -60,8 +68,9 @@ class UserMarkup(Markup, name='user'):
         user = match.group(1)
         try:
             return self.users[user]
-        except KeyError as cause:
-            raise KeyError(f"User '{user}' is not found in users spec") from cause
+        except KeyError:
+            print(f"[ERROR] User '{user}' is not found in users spec")
+            return match.group(0)
 
     def apply(self, task: Task, text: str) -> Markup.Result:
         output, substitutions = re.subn(self.pattern, self._format_user_, text)
@@ -92,8 +101,9 @@ class MRLinkMarkup(Markup, name='mr-link'):
         project = match.group('project_path')
         try:
             alias = self.projects[project]
-        except KeyError as cause:
-            raise KeyError(f"Project '{project}' is not found in projects spec") from cause
+        except KeyError:
+            print(f"[ERROR] Project '{project}' is not found in projects spec")
+            return match.group(0)
         short_link = f"{alias}/{match.group('mr_id')}"
         return f"[{short_link}|{match.group(0)}]"
 
@@ -121,20 +131,21 @@ class SprintMeetingMarkup(Markup, name='meeting'):
         return cls._is_meeting_task_(task.parent)
 
     def apply(self, task: Task, text: str) -> Markup.Result:
+        # TODO: refactor this and remove _is_meeting_task_() method
         if not self._is_meeting_task_(task):
             return Markup.Result(text, 0)
 
         if task.name == "StandUp":
             output = task.name if not text else f"{task.name}: {text}"
-        elif task.name == "Meeting":
-            output = "Meeting" if not text else f"{text.capitalize()} meeting"
-        else:
+        elif task.name.startswith("Sprint"):
             if not text:
                 output = f"{task.name} meeting"
             elif text.isdecimal():
                 output = f"{task.name} {text} meeting"
             else:
                 return Markup.Result(text, 0)
+        else:
+            return Markup.Result(text, 0)
 
         return Markup.Result(output, 1, complete=True)
 
@@ -146,6 +157,7 @@ class JiraFormatter:
         'mr-link',
         'user',
         'code',
+        'hyphen',
     ]
 
     formatters: list[str]
@@ -170,7 +182,8 @@ class JiraFormatter:
             if result.substitutions > 0:
                 output = result.text
 
-        if not output:
+        # TODO: Change this to apply only to children of General task
+        if not output and task.name in CONFIG.tasks:
             output = task.name.lower().capitalize()
         return output
 
@@ -195,12 +208,13 @@ if __name__ == '__main__':
             "/-/merge_requests/666/diffs"
             "?commit_id=f1557db17a036bc7a013c9fe017747f40c0e50b6&test=42"
             "#6a1cedd04f2a144f2720e56745b259dfab28ed9c_313_313 "
-            "with @Kirill",
+            "with @Kirill\n"
+            "Discuss `--some-option` -- with @Kirill\n",
         )
         print(res)
 
     if mode == 'meeting':
-        res = formatter.format(meeting_task, "goofy discussion")
+        res = formatter.format(meeting_task, "Goofy discussion with @Kirill")
         print(res)
 
     if mode == 'sprint':

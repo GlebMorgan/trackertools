@@ -5,7 +5,6 @@ from traceback import print_exception
 
 from command import Command
 from config import CONFIG
-from tools import AppError
 
 
 class App:
@@ -22,12 +21,15 @@ class App:
         for cmd in Command.all.values():
             try:
                 parsed = cmd.parse(command)
-            except AppError as error:
+            # pylint: disable=broad-except
+            except Exception as error:
                 print_exception(error)
                 return
+
             if parsed is None:
                 return
-            elif parsed > max_parsed:
+
+            if parsed > max_parsed:
                 max_parsed = parsed
 
         if max_parsed == 0:

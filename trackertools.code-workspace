@@ -10,7 +10,6 @@
 		},
 		"editor.minimap.scale": 2,
 		"editor.minimap.enabled": false,
-		"editor.rulers": [92],
 		"editor.unicodeHighlight.ambiguousCharacters": false,
 		"python.analysis.typeCheckingMode": "strict",
 		"python.analysis.diagnosticMode": "workspace",
@@ -58,8 +57,11 @@
 			"--profile", "black",
 			"--line-length", "92",
 			"--lines-after-imports", "2",
+			"--multi-line", "9",
+			"--balanced",
 		],
 		"[python]": {
+			"editor.rulers": [92],
 			"editor.defaultFormatter": "ms-python.black-formatter",
 			"editor.formatOnSave": true,
 			"editor.codeActionsOnSave": {

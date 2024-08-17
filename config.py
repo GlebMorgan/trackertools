@@ -3,18 +3,22 @@ from __future__ import annotations
 import sys
 
 from config_loader import ConfigDict, JsonLoader, KeyValueLoader
-from tools import noop
+from tools import AppError, noop
+
+
+class ConfigError(AppError):
+    pass
 
 
 CONFIG = ConfigDict(
     debug=True,
-    scrollback=False,
+    scrollback=True,
     cache_path='./__cache__',
     backend='timecamp',
     credentials=ConfigDict(
-        timeular=KeyValueLoader("credentials/timeular.cfg"),
-        timecamp=KeyValueLoader("credentials/timecamp.cfg"),
-        jira=KeyValueLoader("credentials/jira.cfg"),
+        timeular=KeyValueLoader("keys/timeular.cfg"),
+        timecamp=KeyValueLoader("keys/timecamp.cfg"),
+        jira=KeyValueLoader("keys/jira.cfg"),
     ),
     tasks=JsonLoader("config/tasks.json"),
     specs=JsonLoader("config/specs.json"),
@@ -22,4 +26,5 @@ CONFIG = ConfigDict(
     projects=JsonLoader("config/projects.json"),
 )
 
+# TODO: Move this to tools.py if possible
 trace = print if CONFIG.debug is True or '-d' in sys.argv else noop

@@ -8,6 +8,7 @@ from tools import constricted_repr
 
 
 class ConfigDict(dict[str, Any]):
+    # ToDo: Recursive `ConfigDict`s
     __slots__ = ()
 
     def __init__(self, *args: Any, **kwargs: Any):
@@ -86,7 +87,7 @@ class FileLoader(ConfigLoader):
 
 class StringLoader(FileLoader):
     def load(self) -> str:
-        with open(self.filepath, encoding='utf-8') as file:
+        with self.filepath.open(encoding='utf-8') as file:
             value = file.read()
         return value.strip()
 
@@ -99,7 +100,7 @@ class KeyValueLoader(FileLoader):
 
     def load(self) -> ConfigDict:
         config = ConfigDict()
-        with open(self.filepath, encoding='utf-8') as file:
+        with self.filepath.open(encoding='utf-8') as file:
             for line in file:
                 key, value = line.split(' = ', 1)
                 key = key.strip()
@@ -110,7 +111,7 @@ class KeyValueLoader(FileLoader):
 
 class JsonLoader(FileLoader):
     def load(self) -> ConfigDict:
-        with open(self.filepath, encoding='utf-8') as file:
+        with self.filepath.open(encoding='utf-8') as file:
             data = json.load(file)
         return ConfigDict(data)
 

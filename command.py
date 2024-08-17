@@ -5,14 +5,15 @@ from datetime import date, time, timedelta
 from enum import Enum
 from itertools import groupby
 from operator import itemgetter
-from typing import Callable, ClassVar, Dict, List, Literal, Tuple, Type
+from typing import Any, Callable, ClassVar, Dict, List, Literal, Tuple, Type
 
 from config import CONFIG, trace
 from entry import Entry
-from jira_server import Jira
+from jira_client import Jira
 from table import Table
 from task import Task
-from tokens import Date, Get, JiraID, Node, Quit, Span, Text, Time, Toggle, Token, Week
+from tokens import Date, Get, JiraID, Node, Quit, Span, Text
+from tokens import Time, TimeList, Toggle, Token, Week
 from tools import AppError, Format, deprecated, quoted, timespan_to_duration
 
 
@@ -25,7 +26,7 @@ match CONFIG.backend:
         raise ImportError(f"Invalid backend config: '{other}'")
 
 
-Handler = Callable[..., None]
+Handler = Callable[..., Any]
 Template = List[Type[Token] | str]
 LoadMethod = Literal['get', 'load', 'fetch']
 
@@ -40,6 +41,7 @@ class Group(Enum):
     CACHE = 'cache'
     CONFIG = 'conf'
     JIRA = 'jira'
+    RND = 'rnd'
 
 
 class Command:
@@ -65,7 +67,8 @@ class Command:
         tokens: List[Token] = []
         marker: int = 0
 
-        # Enter means 'show' command
+        # Enter means 'show' commands
+        # TODO: change this to "last entered command" and remove Table.display_latest()
         if command.strip() == '':
             Table.display_latest()
             return None
@@ -171,6 +174,13 @@ def display_table_for_node(entry: Entry):
     print(NotImplemented)
 
 
+@Command(Group.SHOW, ['tasks'])
+def show_tasks():
+    """Display tasks time estimation"""
+    Jira.login(CONFIG.credentials.jira.token)
+    Table.display_task_estimations()
+
+
 @Command(Group.LOAD, [Get, Date])
 def load_data_for_day(method: LoadMethod, day: date):
     """Load or fetch entries for the specified date"""
@@ -185,7 +195,6 @@ def load_data_for_day(method: LoadMethod, day: date):
             Server.login(CONFIG.credentials[CONFIG.backend])
             Task.fetch()
             Entry.fetch(day, day)
-            Server.logout()
     action: str = method.capitalize() + 'ed'
     trace(f"{action} {len(Entry.all)} entries for {day:{Format.YMD}} day")
 
@@ -205,7 +214,6 @@ def load_data_for_week(method: LoadMethod, monday: date):
             Server.login(CONFIG.credentials[CONFIG.backend])
             Task.fetch()
             Entry.fetch(monday, friday)
-            Server.logout()
     action: str = method.capitalize() + 'ed'
     trace(f"{action} {len(Entry.all)} entries for {monday:{Format.YMD}} week")
 
@@ -224,7 +232,6 @@ def load_data_for_period(method: LoadMethod, start: date, end: date):
             Server.login(CONFIG.credentials[CONFIG.backend])
             Task.fetch()
             Entry.fetch(start, end)
-            Server.logout()
     action: str = method.capitalize() + 'ed'
     time_period: str = f"{start:{Format.YMD}} — {end:{Format.YMD}} period"
     trace(f"{action} {len(Entry.all)} entries for {time_period}")
@@ -346,7 +353,8 @@ def split_entry(parent: Entry, span: timedelta, text: str):
         )
     if not text or text == '...':
         text = parent.text
-    child = Entry(parent.task, parent.end - span, parent.end, text)
+
+    child = Entry(Entry.gen_id(parent), parent.task, parent.end - span, parent.end, text)
     parent.end -= span
     trace(
         f"Detached #{parent.alias} —> #{child.alias}: "
@@ -443,9 +451,15 @@ def set_entry_task(entry: Entry, task: Task):
 @Command(Group.MODIFY, [Node, ':', Text])
 def set_entry_description(entry: Entry, text: str):
     """Edit entry description"""
-    entry.text = text
+    new_description = '\n'.join(text.split(' | '))
+
+    if entry.formatted():
+        entry.markup = new_description
+    else:
+        entry.text = new_description
+
     entry.fix_whitespace()
-    trace(f"#{entry.alias}: \"{entry.text}\"")
+    trace(f"#{entry.alias}: \"{entry.description}\"")
 
 
 @Command(Group.FORMAT, ['fix'])
@@ -484,10 +498,62 @@ def cache_clear():
     print(NotImplemented, "clear cache")
 
 
+@Command(Group.JIRA, ['log', Node])
+def log_work(entry: Entry) -> bool:
+    """Add entry worklog to Jira"""
+    Jira.login(CONFIG.credentials.jira.token)
+    was_logged = entry.logged()
+    if was_logged:
+        entry.remove_jira_log()
+    result = entry.log_to_jira()
+    if result is True:
+        trace(
+            f"{'Adjusted' if was_logged else 'Logged'} work:"
+            f" {entry.task.jira}"
+            f" ({entry.day} {entry.start.hour:02}:{entry.start.minute:02})"
+            f" [{entry.duration}]: {entry.description}"
+        )
+    return result
+
+
+@Command(Group.JIRA, ['log', 'all'])
+def log_all():
+    """Add worklog of all loaded entries to Jira"""
+    logged = 0
+    failed = 0
+
+    Jira.login(CONFIG.credentials.jira.token)
+
+    for entry in Entry.all.values():
+        result = log_work(entry)
+        if result is True:
+            logged += 1
+        else:
+            failed += 1
+
+    summary = f"Added worklog to Jira for {logged} entries"
+    if failed > 0:
+        summary += f", failed {failed} entries"
+    print(summary)
+
+
+@Command(Group.RND, ['rnd', TimeList])
+def get_rnd_times_manually(hours: List[timedelta | None]):
+    """Get RND hours for loaded work days manually"""
+    total_days = len(Table.group_by_days(Entry.all.values()))
+    if len(hours) != total_days:
+        raise AppError(f"Expected {total_days} RND time intervals, got {len(hours)}")
+
+    Table.set_daily_targets(hours)
+
+    durations = [timespan_to_duration(x) if x is not None else '-' for x in hours]
+    trace(f"Set RND hours for {total_days} days: [{', '.join(durations)}]")
+
+
 @Command(Group.CONFIG, ['scrollback', Toggle])
 def toggle_auto_display(state: bool):
     """Toggle auto-scrolling of displayed entry table to the top of the screen"""
-    CONFIG.scrollback = state
+    Table.scrollback = state
 
 
 @Command(Group.CONFIG, ['help'])
@@ -501,30 +567,5 @@ def show_help():
 def finish(_):
     """Exit the application"""
     Server.logout()
+    Jira.logout()
     sys.exit(0)
-
-
-@Command(Group.JIRA, [Node, 'log'])
-def log_work(entry: Entry):
-    """Add entry worklog to Jira"""
-    Jira.login(CONFIG.credentials.jira.token)
-    was_logged = entry.logged()
-    if was_logged:
-        Jira.delete_worklog(entry)
-    Jira.add_worklog(entry)
-    trace(
-        f"{'Adjusted' if was_logged else 'Logged'} work:"
-        f" {entry.task.jira}"
-        f" ({entry.day} {entry.start.hour:02}:{entry.start.minute:02})"
-        f" [{entry.duration}]: {entry.markup}"
-    )
-    Jira.logout()
-
-
-@Command(Group.JIRA, ['log', 'all'])
-def log_all():
-    """Add worklog of all loaded entries to Jira"""
-    Jira.login(CONFIG.credentials.jira.token)
-    for entry in Entry.all.values():
-        log_work(entry)
-    Jira.logout()
