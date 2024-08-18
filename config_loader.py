@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,13 @@ class JsonLoader(FileLoader):
         return ConfigDict(data)
 
 
+class TomlLoader(FileLoader):
+    def load(self) -> ConfigDict:
+        with self.filepath.open(mode='rb') as file:
+            data = tomllib.load(file)
+        return ConfigDict(data)
+
+
 class TestLoader(ConfigLoader):
     def __init__(self, string: str):
         self.string = string
@@ -133,4 +141,5 @@ if __name__ == '__main__':
         keyval=KeyValueLoader("test-data/key-value.txt"),
         dict=DictLoader({'number': 42, 'array': [1, 2, 3], 'stuff': ...}),
         projects=JsonLoader("config/projects.json"),
+        toml=TomlLoader("test-data/test-table.toml"),
     )

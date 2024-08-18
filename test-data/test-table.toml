@@ -1,0 +1,3 @@
+12345678 = { space = "T5", task = "StandUp", jira = "JIRA-1234" }
+13423769 = { space = "T5", task = "MR", jira = "JIRA-2500" }
+00000000 = { space = "FM64", task = "Meeting", jira = "JIRA-0000" }
