@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import ClassVar, Dict, NewType, Sequence
+from typing import Any, ClassVar, Dict, NewType, Self, Sequence
 
 from adapter import BackendDataError, GenericTask
 from api import BackendData
 from cache import CacheManager
-from config import CONFIG, trace
+from config import CONFIG, ConfigError, trace
 from jira_client import Jira, TimeEstimate
 
 
@@ -78,6 +78,7 @@ class Task:
             task: Task = cls.gen(generic_task)
             if check_health is True:
                 task._check_health_()
+        TaskDescriptor.validate()
 
     def _check_health_(self) -> bool:
         healthy: bool = True
@@ -123,14 +124,11 @@ class Task:
         if task.jira:
             return JiraId(task.jira)
 
-        name = task.title.strip()
-        if name in CONFIG.tasks:
-            jira_id = CONFIG.tasks[name]
-            return JiraId(jira_id) if jira_id else None
+        if task.id not in TaskDescriptor.descriptors:
+            raise ConfigError(f"Task '{task.title}' (ID={task.id}) missing in config")
 
-        raise BackendDataError(
-            f"Task '{task.id}': Invalid general task name '{task.title}'"
-        )
+        jira_id = TaskDescriptor.descriptors[task.id].jira
+        return JiraId(jira_id) if jira_id else None
 
     @classmethod
     def _parse_parent_(cls, task: GenericTask) -> Task | None:
@@ -143,6 +141,55 @@ class Task:
         raise BackendDataError(
             f"Task '{task.id}': Parent id '{task.parent}' not in the list"
         )
+
+
+@dataclass(slots=True, frozen=True)
+class TaskDescriptor:
+    id: int
+    name: str
+    space: str
+    jira: str | None
+
+    descriptors: ClassVar[dict[int, Self]] = {}
+
+    @classmethod
+    def load_from_config(cls, config: dict[str, dict[str, dict[str, Any]]]):
+        for space, task_specs in config.items():
+            assert isinstance(task_specs, dict)
+            for spec in task_specs.values():
+                assert isinstance(spec, dict)
+                assert all(attr in spec for attr in ('id', 'task', 'jira'))
+                cls(int(spec['id']), spec['task'], space, spec['jira'])
+
+    @classmethod
+    def validate(cls):
+        for descriptor in cls.descriptors.values():
+            if descriptor.id not in Task.all:
+                raise ConfigError(f"Unknown task: '{descriptor.name}' (ID={descriptor.id})")
+
+            task = Task.all[descriptor.id]
+            if not descriptor.validate_name(task):
+                raise ConfigError(
+                    f"Task name mismatch: server='{task.name}', config='{descriptor.name}'"
+                )
+            if not descriptor.validate_space(task):
+                raise ConfigError(
+                    f"Task '{descriptor.name}' (ID={descriptor.id}) "
+                    f"has invalid space '{descriptor.space}'"
+                )
+
+    def validate_name(self, task: Task) -> bool:
+        return self.name == task.name
+
+    def validate_space(self, task: Task | None) -> bool:
+        while task is not None:
+            if self.space == task.name:
+                return True
+            task = task.parent
+        return False
+
+    def __post_init__(self):
+        self.__class__.descriptors[self.id] = self
 
 
 if __name__ == '__main__':

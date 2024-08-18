@@ -5,11 +5,13 @@ from traceback import print_exception
 
 from command import Command
 from config import CONFIG
+from task import TaskDescriptor
 
 
 class App:
     @classmethod
     def main(cls):
+        TaskDescriptor.load_from_config(CONFIG.tasks)
         while True:
             command = input("> ")
             cls.process(command)

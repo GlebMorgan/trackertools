@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from config_loader import ConfigDict, JsonLoader, KeyValueLoader
+from config_loader import ConfigDict, JsonLoader, KeyValueLoader, TomlLoader
 from tools import AppError, noop
 
 
@@ -20,7 +20,7 @@ CONFIG = ConfigDict(
         timecamp=KeyValueLoader("keys/timecamp.cfg"),
         jira=KeyValueLoader("keys/jira.cfg"),
     ),
-    tasks=JsonLoader("config/tasks.json"),
+    tasks=TomlLoader("config/tasks.toml"),
     specs=JsonLoader("config/specs.json"),
     users=JsonLoader("config/users.json"),
     projects=JsonLoader("config/projects.json"),

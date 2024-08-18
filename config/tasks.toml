@@ -1,0 +1,6 @@
+[T5]
+standup = {id = 12345678, task = "StandUp", jira = "JIRA-1234"}
+merge-request = {id = 13423769, task = "MR", jira = "JIRA-2500"}
+
+[FM64]
+meeting = {id = 0, task = "Meeting", jira = "JIRA-0000"}
