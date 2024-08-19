@@ -6,7 +6,7 @@ from bisect import insort
 from collections import defaultdict
 from datetime import date, timedelta
 from itertools import groupby
-from typing import Callable, ClassVar, Collection, Dict, List, Tuple
+from typing import Callable, ClassVar, Collection, Dict, List
 
 from config import CONFIG
 from entry import Entry
@@ -27,12 +27,8 @@ class Table:
     targets: ClassVar[List[timedelta | None]] = []
 
     @staticmethod
-    def _display_order_(entry: Entry) -> Tuple[int, date]:
-        if entry.task.name in CONFIG.tasks:
-            task_index = list(CONFIG.tasks.keys()).index(entry.task.name)
-        else:
-            task_index = entry.task.id
-        return (task_index, entry.start.date())
+    def _display_order_(entry: Entry) -> date:
+        return entry.start.date()
 
     @staticmethod
     def _get_status_glyph_(entry: Entry) -> str:
