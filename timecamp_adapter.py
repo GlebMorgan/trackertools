@@ -3,16 +3,15 @@ from __future__ import annotations
 import re
 import sys
 from datetime import date, datetime, time
-from typing import Tuple
 
 from adapter import BackendAdapter, BackendDataError, GenericEntry, GenericTask
 from api import BackendData
 from timecamp_api import TimecampEntry, TimecampTask
-from tools import CURRENT_TZ, Format
+from tools import CURRENT_TZ, Format, unwrap
 
 
-# JIRA_REGEX = re.compile(r'\[([A-Z0-9]+-[0-9]+)\] ')
-TASK_NAME_REGEX = re.compile(r'(?:\[(?P<jira>[A-Z0-9]+-[0-9]+)\])?\s*(?:(?P<title>.+))?')
+JIRA_REGEX = re.compile(r'jira:\s?([A-Z0-9]+-[0-9]+)', re.IGNORECASE)
+SPEC_REGEX = re.compile(r'spec:\s?([A-Z]+)', re.IGNORECASE)
 
 
 class TimecampAdapter(BackendAdapter):
@@ -31,9 +30,11 @@ class TimecampAdapter(BackendAdapter):
             error_msg = "Task '{task_id}': Invalid parent id '{parent_id}'"
             raise BackendDataError(error_msg.format(**timecamp_task)) from cause
 
-        title, jira = cls._parse_title_(timecamp_task)
+        title = unwrap(timecamp_task['name'].strip())
+        jira = cls._get_jira_(timecamp_task)
+        spec = cls._get_spec_(timecamp_task)
 
-        return GenericTask(task_id, parent_id, title, jira, spec=None)
+        return GenericTask(task_id, parent_id, title, jira, spec)
 
     @classmethod
     def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
@@ -78,20 +79,20 @@ class TimecampAdapter(BackendAdapter):
         return GenericEntry(entry_id, task_id, start, end, text)
 
     @staticmethod
-    def _parse_title_(raw_task: TimecampTask) -> Tuple[str, str]:
-        # TODO: review the algorithm
+    def _get_jira_(raw_task: TimecampTask) -> str | None:
+        for line in raw_task['note'].splitlines():
+            jira_match = JIRA_REGEX.match(line)
+            if jira_match:
+                return jira_match.group(1)
+        return None
 
-        match = TASK_NAME_REGEX.match(raw_task['name'].strip())
-
-        if not match:
-            error_msg = "Task '{task_id}': Invalid task name format: '{name}'"
-            raise BackendDataError(error_msg.format(**raw_task))
-
-        if match['title'] is None:
-            error_msg = "Task '{task_id}': Missing task title: '{name}'"
-            raise BackendDataError(error_msg.format(**raw_task))
-
-        return match['title'], match['jira']
+    @staticmethod
+    def _get_spec_(raw_task: TimecampTask) -> str | None:
+        for line in raw_task['note'].splitlines():
+            spec_match = SPEC_REGEX.match(line)
+            if spec_match:
+                return spec_match.group(1)
+        return None
 
 
 if __name__ == '__main__':
@@ -113,6 +114,7 @@ if __name__ == '__main__':
         parent_id=0,
         level=1,
         name="[FMXX-1234] (TT) Task name (valid)",
+        note='\n'.join(("jira: TEST-42", "spec: TT", "Test task description")),
     )
 
     match sys.argv[1:]:
@@ -124,9 +126,13 @@ if __name__ == '__main__':
             test_task = TimecampAdapter.parse_task(test_raw_task)
             print(test_task)
 
-        case ['title']:
-            test_title, test_jira = TimecampAdapter._parse_title_(test_raw_task)
-            print(f"{test_title=}, {test_jira=}")
+        case ['jira']:
+            test_jira = TimecampAdapter._get_jira_(test_raw_task)
+            print(test_jira)
+
+        case ['spec']:
+            test_spec = TimecampAdapter._get_spec_(test_raw_task)
+            print(test_spec)
 
         case other:
             pass

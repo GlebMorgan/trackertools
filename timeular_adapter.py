@@ -7,13 +7,8 @@ from typing import Dict, List, Sequence, Tuple, cast
 
 from adapter import BackendAdapter, BackendDataError, GenericEntry, GenericTask
 from api import BackendData
-from timeular_api import (
-    TimeularEntry,
-    TimeularEntryNote,
-    TimeularMention,
-    TimeularTag,
-    TimeularTask,
-)
+from timeular_api import TimeularEntry, TimeularEntryNote
+from timeular_api import TimeularMention, TimeularTag, TimeularTask
 from tools import CURRENT_TZ, unwrap
 
 
@@ -88,7 +83,7 @@ class TimeularAdapter(BackendAdapter):
         if title is None:
             error_msg = "Task '{id}': Missing task title: '{name}'"
             raise BackendDataError(error_msg.format(**raw_task))
-        title = unwrap(title).strip()
+        title = unwrap(title.strip())
 
         jira = match['jira']
         if jira is not None:

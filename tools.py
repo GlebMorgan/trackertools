@@ -60,7 +60,7 @@ def unwrap(s: str) -> str:
     for brackets in zip('{([{', '}])}'):
         if s[0] == brackets[0] and s[-1] == brackets[1]:
             s = s[1:-1]
-    return s
+    return s.strip()
 
 
 def quoted(strings: Iterable[str]) -> Iterable[str]:

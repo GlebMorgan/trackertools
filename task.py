@@ -49,7 +49,7 @@ class Task:
         if task_id in cls.all:
             raise RuntimeError(f"Task '{task_id}': already exists: {cls.all[task_id]}")
 
-        name = generic_task.title.strip()
+        name = generic_task.title
         parent = cls._parse_parent_(generic_task)
         jira = cls._parse_jira_(generic_task)
         spec = cls._parse_spec_(generic_task)
@@ -113,24 +113,13 @@ class Task:
         if task.spec in CONFIG.specs:
             return Spec(CONFIG.specs[task.spec])
 
-        if task.spec in CONFIG.specs.values():
-            return Spec(task.spec)
-
         raise BackendDataError(f"Task '{task.id}': invalid spec '{task.spec}'")
 
     @classmethod
     def _parse_jira_(cls, task: GenericTask) -> JiraId | None:
         if task.jira:
             return JiraId(task.jira)
-
-        name = task.title.strip()
-        if name in CONFIG.tasks:
-            jira_id = CONFIG.tasks[name]
-            return JiraId(jira_id) if jira_id else None
-
-        raise BackendDataError(
-            f"Task '{task.id}': Invalid general task name '{task.title}'"
-        )
+        return None
 
     @classmethod
     def _parse_parent_(cls, task: GenericTask) -> Task | None:

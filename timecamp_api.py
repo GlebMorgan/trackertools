@@ -14,6 +14,7 @@ class TimecampTask(TypedDict):
     parent_id: int
     level: int
     name: str
+    note: str
 
 
 class TimecampEntry(TypedDict):
