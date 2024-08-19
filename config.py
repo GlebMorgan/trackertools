@@ -13,6 +13,7 @@ class ConfigError(AppError):
 CONFIG = ConfigDict(
     debug=True,
     scrollback=True,
+    jira_estimates=True,
     cache_path='./__cache__',
     backend='timecamp',
     credentials=ConfigDict(

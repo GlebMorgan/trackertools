@@ -556,6 +556,12 @@ def toggle_auto_display(state: bool):
     Table.scrollback = state
 
 
+@Command(Group.CONFIG, ['estimates', Toggle])
+def toggle_jira_estimates_display(state: bool):
+    """Toggle fetching and showing Jira time logging info (time remaining)"""
+    Table.show_estimates = state
+
+
 @Command(Group.CONFIG, ['help'])
 def show_help():
     """Display commands help"""

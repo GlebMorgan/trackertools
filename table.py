@@ -16,12 +16,13 @@ from tools import TODAY, AppError, constrict, seconds_to_duration, timespan_to_d
 
 
 TOP_SCROLL_SEQUENCE = "\033[H\033[J"
-GAP = 3
+GAP = " " * 3
 
 
 class Table:
     widths: ClassVar[Dict[str, int]] = defaultdict(int)
     scrollback: ClassVar[bool] = CONFIG.scrollback
+    show_estimates: ClassVar[bool] = CONFIG.jira_estimates
     stored_interval: ClassVar[tuple[date, date] | None] = None
     targets: ClassVar[List[timedelta | None]] = []
 
@@ -52,8 +53,9 @@ class Table:
 
     @classmethod
     def _trunc_description_(cls, description: str) -> str:
+        # TODO: calculate width left for description dynamically
         console_width = os.get_terminal_size().columns
-        max_width = console_width - cls.widths['jira'] - GAP - cls.widths['task'] - 38
+        max_width = console_width - cls.widths['jira'] - len(GAP) - cls.widths['task'] - 38
         return constrict(description, width=max_width)
 
     @classmethod
@@ -65,16 +67,23 @@ class Table:
 
     @classmethod
     def format_row(cls, entry: Entry) -> str:
-        status = cls._get_status_glyph_(entry)
-        return (
-            f"{status} {entry.alias :{2 + GAP}}"
-            f"{entry.start.strftime('%H:%M') :{5 + GAP}}"
-            f"{entry.duration :{6 + GAP}}"
-            f"{cls._align_negative_time_(cls._format_time_remaining_(entry)) :{8 + GAP}}"
-            f"{entry.task.jira or '-' :<{cls.widths['jira'] + GAP}}"
-            f"{entry.task.name :<{cls.widths['task'] + GAP}}"
-            f"{cls._trunc_description_(entry.description)}"
+        columns = dict(
+            alias=f"{entry.alias:2}",
+            start=f"{entry.start.strftime('%H:%M'):5}",
+            duration=f"{entry.duration:6}",
+            remaining=None,
+            jira=f"{entry.task.jira or '-' :<{cls.widths['jira']}}",
+            taskname=f"{entry.task.name :<{cls.widths['task']}}",
+            description=f"{cls._trunc_description_(entry.description)}",
         )
+
+        if cls.show_estimates is True:
+            remaining_duration = cls._format_time_remaining_(entry)
+            duration_column = f"{cls._align_negative_time_(remaining_duration) :{8}}"
+            columns['remaining'] = duration_column
+
+        status = cls._get_status_glyph_(entry)
+        return status + " " + GAP.join(filter(None, columns.values()))
 
     @classmethod
     def group_by_days(cls, entries: Collection[Entry]) -> Dict[date, List[Entry]]:
@@ -90,8 +99,6 @@ class Table:
 
     @classmethod
     def display_grouped(cls, entries: Collection[Entry]):
-        Jira.login(CONFIG.credentials.jira.token)
-
         cls._set_column_widths_()
 
         if cls.scrollback is False:
@@ -145,7 +152,7 @@ class Table:
             "Estimate".ljust(12),
             "Remaining".ljust(12),
             "Spent".ljust(12),
-            sep=' ' * GAP,
+            sep=GAP,
         )
 
         for task in tasks:
@@ -165,7 +172,7 @@ class Table:
                 f"{seconds_to_duration(tracking.estimated):12}",
                 f"{seconds_to_duration(tracking.remaining):12}",
                 f"{seconds_to_duration(logged):12}",
-                sep=' ' * GAP,
+                sep=GAP,
             )
 
     @classmethod
@@ -185,7 +192,9 @@ class Table:
         if entry.task.name in CONFIG.tasks:
             return ""
 
+        Jira.login(CONFIG.credentials.jira.token)
         tracking = Jira.get_timetracking(entry.task.jira)
+
         if tracking is None:
             raise AppError(f"Failed to get time tracking for {entry.task.jira}")
 

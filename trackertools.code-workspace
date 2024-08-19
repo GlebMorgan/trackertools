@@ -35,6 +35,7 @@
 			"--disable", "unused-variable",
 			"--disable", "too-few-public-methods",
 			"--disable", "consider-iterating-dictionary",
+			"--disable", "use-dict-literal",
 		],
 		// Black style: https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html
 		"black-formatter.args": [
