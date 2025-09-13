@@ -153,6 +153,10 @@ class Week(Token):
     def get_work_week(monday: date) -> Tuple[date, date]:
         return monday, monday + timedelta(days=4)
 
+    @staticmethod
+    def get_week(monday: date) -> Tuple[date, date]:
+        return monday, monday + timedelta(days=6)
+
     def evaluate(self) -> date:
         assert self.match is not None
         assert self.format is not None

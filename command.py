@@ -157,7 +157,7 @@ def display_table_for_day(day: date):
 def display_table_for_week(monday: date):
     """Display table of entries for the specified week"""
     trace(f"Table entries for {monday:{Format.YMD}} week:")
-    Table.display_for(*Week.get_work_week(monday))
+    Table.display_for(*Week.get_week(monday))
 
 
 @Command(Group.SHOW, ['show', Date, '..', Date])
@@ -202,7 +202,7 @@ def load_data_for_day(method: LoadMethod, day: date):
 @Command(Group.LOAD, [Get, Week])
 def load_data_for_week(method: LoadMethod, monday: date):
     """Load or fetch entries for the current week"""
-    monday, friday = Week.get_work_week(monday)
+    monday, friday = Week.get_week(monday)
     match method:
         case 'get':
             raise NotImplementedError("App.get()")
@@ -307,7 +307,7 @@ def combine_entries_for_day(day: date):
 @Command(Group.COMBINE, ['combine', Week])
 def combine_entries_for_week(monday: date):
     """Merge entries with the same description within the specified week"""
-    merged = Entry.combine_for(*Week.get_work_week(monday))
+    merged = Entry.combine_for(*Week.get_week(monday))
     trace(f"Combined {merged} entries within {monday:{Format.YMD}} week")
 
 
