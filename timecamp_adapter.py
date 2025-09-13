@@ -10,8 +10,7 @@ from timecamp_api import TimecampEntry, TimecampTask
 from tools import CURRENT_TZ, Format, unwrap
 
 
-JIRA_REGEX = re.compile(r'jira:\s?([A-Z0-9]+-[0-9]+)', re.IGNORECASE)
-SPEC_REGEX = re.compile(r'spec:\s?([A-Z]+)', re.IGNORECASE)
+PROPERTY_REGEX = re.compile(r'(\w+):\s*(.+)', re.IGNORECASE)
 
 
 class TimecampAdapter(BackendAdapter):
@@ -31,10 +30,9 @@ class TimecampAdapter(BackendAdapter):
             raise BackendDataError(error_msg.format(**timecamp_task)) from cause
 
         title = unwrap(timecamp_task['name'].strip())
-        jira = cls._get_jira_(timecamp_task)
-        spec = cls._get_spec_(timecamp_task)
+        properties = cls._get_properties_(timecamp_task)
 
-        return GenericTask(task_id, parent_id, title, jira, spec)
+        return GenericTask(task_id, parent_id, title, properties)
 
     @classmethod
     def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
@@ -79,20 +77,15 @@ class TimecampAdapter(BackendAdapter):
         return GenericEntry(entry_id, task_id, start, end, text)
 
     @staticmethod
-    def _get_jira_(raw_task: TimecampTask) -> str | None:
+    def _get_properties_(raw_task: TimecampTask) -> dict[str, str]:
+        properties: dict[str, str] = {}
         for line in raw_task['note'].splitlines():
-            jira_match = JIRA_REGEX.match(line)
-            if jira_match:
-                return jira_match.group(1)
-        return None
-
-    @staticmethod
-    def _get_spec_(raw_task: TimecampTask) -> str | None:
-        for line in raw_task['note'].splitlines():
-            spec_match = SPEC_REGEX.match(line)
-            if spec_match:
-                return spec_match.group(1)
-        return None
+            prop_match = PROPERTY_REGEX.match(line.strip())
+            if prop_match:
+                key = prop_match.group(1).lower()
+                value = prop_match.group(2).strip()
+                properties[key] = value
+        return properties
 
 
 if __name__ == '__main__':
@@ -114,7 +107,12 @@ if __name__ == '__main__':
         parent_id=0,
         level=1,
         name="[FMXX-1234] (TT) Task name (valid)",
-        note='\n'.join(("jira: TEST-42", "spec: TT", "Test task description")),
+        note="""
+             Type: Ticket
+             Jira: FMXX-1234
+             Spec: TT
+             Description: Test task description
+             """,
     )
 
     match sys.argv[1:]:
@@ -126,13 +124,9 @@ if __name__ == '__main__':
             test_task = TimecampAdapter.parse_task(test_raw_task)
             print(test_task)
 
-        case ['jira']:
-            test_jira = TimecampAdapter._get_jira_(test_raw_task)
-            print(test_jira)
-
-        case ['spec']:
-            test_spec = TimecampAdapter._get_spec_(test_raw_task)
-            print(test_spec)
+        case ['props']:
+            test_props = TimecampAdapter._get_properties_(test_raw_task)
+            print(test_props)
 
         case other:
             pass

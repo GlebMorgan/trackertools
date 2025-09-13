@@ -11,7 +11,7 @@ from config import CONFIG, trace
 from entry import Entry
 from jira_client import Jira
 from table import Table
-from task import Task
+from task import Task, TaskType
 from tokens import Date, Get, JiraID, Node, Quit, Span, Text
 from tokens import Time, TimeList, Toggle, Token, Week
 from tools import AppError, Format, deprecated, quoted, timespan_to_duration
@@ -271,12 +271,11 @@ def delete_entries_for_period(start: date, end: date):
 def delete_personal_entries():
     """Delete all entries with activities that does not have associated Jira ID"""
     deleted = 0
-    personal_tasks = [name for name, jira in CONFIG.tasks.items() if jira is None]
     for entry in list(Entry.all.values()):
-        if entry.task.name in personal_tasks:
+        if entry.task.type is TaskType.PERSONAL:
             entry.delete()
             deleted += 1
-    trace(f"Removed {deleted} entries with task names: {', '.join(quoted(personal_tasks))}")
+    trace(f"Removed {deleted} personal entries")
 
 
 @Command(Group.DELETE, ['del', JiraID])

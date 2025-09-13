@@ -143,8 +143,16 @@ Temp:
 
 
 
+Task types:
+• Ticket [default]
+• General (no estimations, auto-generated description)
+• Personal (not logged)
+
+
+
 ToDo:
 [ ] CRITICAL: Sort items by time
+[ ] HIGH: Add `TaskType.AGGREGATE` and check for description in `Entry._check_health_()`
 [ ] HIGH: Cannot edit formatted descriptions
 [ ] HIGH: Change `del XX` to `XX del` for consistency with other commands
 [ ] HIGH: Looks like timezone is not applied when entry time is set manually

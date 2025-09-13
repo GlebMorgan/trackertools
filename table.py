@@ -11,7 +11,7 @@ from typing import Callable, ClassVar, Collection, Dict, List
 from config import CONFIG
 from entry import Entry
 from jira_client import Jira
-from task import JiraId, Task
+from task import JiraId, Task, TaskType
 from tools import TODAY, AppError, constrict, seconds_to_duration, timespan_to_duration
 
 
@@ -139,7 +139,7 @@ class Table:
 
     @classmethod
     def display_task_estimations(cls):
-        tasks = [task for task in Entry.all_tasks() if task.name not in CONFIG.tasks]
+        tasks = [task for task in Entry.all_tasks() if task.type is TaskType.TICKET]
         max_task_name = max(len(task.name) for task in tasks)
 
         print(
@@ -185,7 +185,7 @@ class Table:
         if entry.task.jira is None:
             return "-"
 
-        if entry.task.name in CONFIG.tasks:
+        if entry.task.type is not TaskType.TICKET:
             return ""
 
         Jira.login(CONFIG.credentials.jira.token)

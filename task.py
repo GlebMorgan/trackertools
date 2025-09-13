@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 import sys
 from dataclasses import dataclass
 from typing import ClassVar, Dict, NewType, Sequence
@@ -27,11 +28,18 @@ JiraId = NewType("JiraId", str)
 Spec = NewType("Spec", str)
 
 
+class TaskType(Enum):
+    TICKET = 'ticket'
+    GENERAL = 'general'
+    PERSONAL = 'personal'
+
+
 @dataclass
 class Task:
     id: TaskId
-    parent: Task | None
     name: str
+    parent: Task | None
+    type: TaskType
     jira: JiraId | None
     spec: Spec | None
 
@@ -51,10 +59,11 @@ class Task:
 
         name = generic_task.title
         parent = cls._parse_parent_(generic_task)
+        ttype = cls._parse_type_(generic_task)
         jira = cls._parse_jira_(generic_task)
         spec = cls._parse_spec_(generic_task)
 
-        return cls(task_id, parent, name, jira, spec)
+        return cls(task_id, name, parent, ttype, jira, spec)
 
     @classmethod
     def fetch(cls, validate: bool = True):
@@ -106,32 +115,43 @@ class Task:
         return name
 
     @classmethod
+    def _parse_type_(cls, task: GenericTask) -> TaskType:
+        task_type: str | None = task.properties.get('type')
+        if task_type is None:
+            return TaskType.TICKET
+
+        if any(task_type == item.value for item in TaskType) is False:
+            raise BackendDataError(f"Task '{task.title}': invalid type '{task_type}'")
+
+        return TaskType(task_type)
+
+    @classmethod
     def _parse_spec_(cls, task: GenericTask) -> Spec | None:
-        if task.spec is None:
+        spec: str | None = task.properties.get('spec')
+        if spec is None:
             return None
 
-        if task.spec in CONFIG.specs:
-            return Spec(CONFIG.specs[task.spec])
+        if spec not in CONFIG.specs:
+            raise BackendDataError(f"Task '{task.title}': invalid spec '{spec}'")
 
-        raise BackendDataError(f"Task '{task.id}': invalid spec '{task.spec}'")
+        return Spec(CONFIG.specs[spec])
 
     @classmethod
     def _parse_jira_(cls, task: GenericTask) -> JiraId | None:
-        if task.jira:
-            return JiraId(task.jira)
-        return None
+        jira: str | None = task.properties.get('jira')
+        return JiraId(jira) if jira else None
 
     @classmethod
     def _parse_parent_(cls, task: GenericTask) -> Task | None:
         if not task.parent:
             return None
 
-        if task.parent in cls.all:
-            return cls.all[task.parent]
+        if task.parent not in cls.all:
+            raise BackendDataError(
+                f"Task '{task.title}': Parent id '{task.parent}' not in the list"
+            )
 
-        raise BackendDataError(
-            f"Task '{task.id}': Parent id '{task.parent}' not in the list"
-        )
+        return cls.all[TaskId(task.parent)]
 
 
 if __name__ == '__main__':

@@ -21,7 +21,6 @@ CONFIG = ConfigDict(
         timecamp=KeyValueLoader("keys/timecamp.cfg"),
         jira=KeyValueLoader("keys/jira.cfg"),
     ),
-    tasks=JsonLoader("config/tasks.json"),
     specs=JsonLoader("config/specs.json"),
     users=JsonLoader("config/users.json"),
     projects=JsonLoader("config/projects.json"),

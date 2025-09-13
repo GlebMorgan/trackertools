@@ -8,7 +8,7 @@ from re import Match, Pattern
 from typing import Any, ClassVar, Iterable, Type, TypeAlias
 
 from config import CONFIG
-from task import Task
+from task import Task, TaskType
 
 
 MarkupList: TypeAlias = Iterable[str] | None
@@ -182,8 +182,7 @@ class JiraFormatter:
             if result.substitutions > 0:
                 output = result.text
 
-        # TODO: Change this to apply only to children of General task
-        if not output and task.name in CONFIG.tasks:
+        if not output and task.type is TaskType.GENERAL:
             output = task.name.lower().capitalize()
         return output
 
@@ -193,12 +192,12 @@ if __name__ == '__main__':
 
     mode = sys.argv[1] if len(sys.argv) > 1 else 'example'
 
-    formatter = JiraFormatter()
+    meeting_task = Task(TaskId(13), "Meeting", None, TaskType.GENERAL, None, None)
+    sprint_task = Task(TaskId(28), "Ticket", meeting_task, TaskType.TICKET, None, None)
+    standup_task = Task(TaskId(37), "Standup", meeting_task, TaskType.GENERAL, None, None)
+    test_task = Task(TaskId(42), "Some Task", None, TaskType.TICKET, None, None)
 
-    meeting_task = Task(TaskId(13), None, "Meeting", None, None)
-    sprint_task = Task(TaskId(28), meeting_task, "Sprint Review", None, None)
-    standup_task = Task(TaskId(37), meeting_task, "Standup", None, None)
-    test_task = Task(TaskId(42), None, "Some Task", None, None)
+    formatter = JiraFormatter()
 
     if mode == 'example':
         res = formatter.format(

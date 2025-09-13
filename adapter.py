@@ -23,8 +23,7 @@ class GenericTask(NamedTuple):
     id: int
     parent: int | None
     title: str
-    jira: str | None
-    spec: str | None
+    properties: dict[str, str]
 
 
 class BackendAdapter:

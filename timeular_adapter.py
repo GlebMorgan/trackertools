@@ -29,9 +29,9 @@ class TimeularAdapter(BackendAdapter):
             error_msg = "Invalid task id '{id}'"
             raise BackendDataError(error_msg.format(**timeular_task)) from cause
 
-        title, jira, spec = cls._parse_title_(timeular_task)
+        title, properties = cls._parse_title_(timeular_task)
 
-        return GenericTask(task_id, None, title, jira, spec)
+        return GenericTask(task_id, None, title, properties)
 
     @classmethod
     def parse_entry(cls, raw_entry: BackendData) -> GenericEntry:
@@ -70,7 +70,7 @@ class TimeularAdapter(BackendAdapter):
         return GenericEntry(entry_id, task_id, start, end, text)
 
     @staticmethod
-    def _parse_title_(raw_task: TimeularTask) -> Tuple[str, str, str]:
+    def _parse_title_(raw_task: TimeularTask) -> Tuple[str, Dict[str, str]]:
         # TODO: review the algorithm
 
         match = TASK_NAME_REGEX.match(raw_task['name'].strip())
@@ -95,7 +95,7 @@ class TimeularAdapter(BackendAdapter):
             error_msg = "Task '{id}': Missing jira id: '{name}'"
             raise BackendDataError(error_msg.format(**raw_task))
 
-        return title, jira, spec
+        return title, {'jira': jira, 'spec': spec}
 
     @classmethod
     def _parse_tags_(cls, raw_entry_note: TimeularEntryNote) -> str:
@@ -152,8 +152,8 @@ if __name__ == '__main__':
             print(test_task)
 
         case ['title']:
-            test_title, test_jira, test_spec = TimeularAdapter._parse_title_(test_raw_task)
-            print(f"{test_title=}, {test_jira=}, {test_spec=}")
+            test_title, test_props = TimeularAdapter._parse_title_(test_raw_task)
+            print(f"{test_title=}, {test_props=}")
 
         case other:
             pass

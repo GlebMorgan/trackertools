@@ -15,7 +15,7 @@ from cache import CacheManager
 from config import CONFIG, trace
 from jira_client import Jira
 from jira_formatter import JiraFormatter
-from task import Task
+from task import Task, TaskId, TaskType
 from tools import TODAY, Format, first_word, round_bounds, timespan_to_duration
 
 
@@ -66,7 +66,7 @@ class Entry:
 
     @classmethod
     def gen(cls, generic_entry: GenericEntry) -> Entry:
-        task_id: int = generic_entry.task
+        task_id: TaskId = TaskId(generic_entry.task)
         assert task_id in Task.all
 
         start, end = round_bounds(generic_entry.start, generic_entry.end)
@@ -150,7 +150,7 @@ class Entry:
 
     def _check_health_(self) -> bool:
         healthy: bool = True
-        if not self.text and self.task.name not in CONFIG.tasks:
+        if not self.text and self.task.type is TaskType.TICKET:
             print(f"[WARNING] Entry '{self}' has no description")
             healthy = False
         if self.start.date() > TODAY or self.end.date() > TODAY:
