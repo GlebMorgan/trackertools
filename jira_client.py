@@ -26,7 +26,7 @@ class Jira:
     def login(cls, token: str):
         if cls._server_ is not None:
             return
-        cls._server_ = JIRA(server=cls.URL, token_auth=token, timeout=10)
+        cls._server_ = JIRA(server=cls.URL, token_auth=token)
 
     @classmethod
     def logout(cls):
