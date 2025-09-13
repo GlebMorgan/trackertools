@@ -145,9 +145,15 @@ Temp:
 
 ToDo:
 [ ] CRITICAL: Sort items by time
+[ ] HIGH: Cannot edit formatted descriptions
+[ ] HIGH: Change `del XX` to `XX del` for consistency with other commands
+[ ] HIGH: Looks like timezone is not applied when entry time is set manually
+[ ] HIGH: Command to create new entry
+[ ] HIGH: When editing formatting entry, edit original text and have option to re-format
 [ ] HIGH: Save working entry list to a cache and load back (`.save()` and `.restore()` functions)
 [ ] HIGH: Command `[Node] restore` for mistakenly removed nodes
-[ ] HIGH: Command to create new entry
+[ ] MID: Jira logging via thread pool
+[ ] MID: Generate aliases from the list of most easily typed combinations, like Vimium
 [ ] MID: Commands `show next` and `show prev` (days)
 [ ] MID: Move Timecamp and Timeular -related stuff to separate subdirectories
     (requires investigating running scripts via `python -m script.py`)
