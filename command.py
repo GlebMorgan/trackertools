@@ -500,10 +500,12 @@ def cache_clear():
 @Command(Group.JIRA, ['log', Node])
 def log_work(entry: Entry) -> bool:
     """Add entry worklog to Jira"""
-    Jira.login(CONFIG.credentials.jira.token)
+    Jira.login(*CONFIG.credentials.jira.values())
+
     was_logged = entry.logged()
     if was_logged:
         entry.remove_jira_log()
+
     result = entry.log_to_jira()
     if result is True:
         trace(
@@ -521,7 +523,7 @@ def log_all():
     logged = 0
     failed = 0
 
-    Jira.login(CONFIG.credentials.jira.token)
+    Jira.login(*CONFIG.credentials.jira.values())
 
     for entry in Entry.all.values():
         result = log_work(entry)

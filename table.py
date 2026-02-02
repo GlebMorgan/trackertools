@@ -188,7 +188,7 @@ class Table:
         if entry.task.type is not TaskType.TICKET:
             return ""
 
-        Jira.login(CONFIG.credentials.jira.token)
+        Jira.login(*CONFIG.credentials.jira.values())
         tracking = Jira.get_timetracking(entry.task.jira)
 
         if tracking is None:

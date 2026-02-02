@@ -1,3 +1,7 @@
+"""
+Jira package docs: https://jira.readthedocs.io
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,15 +22,15 @@ class TimeEstimate:
 
 
 class Jira:
-    URL: ClassVar[str] = "https://jira.teltonika.lt"
+    URL: ClassVar[str] = "https://teltonika-telematics.atlassian.net"
 
     _server_: ClassVar[JIRA | None] = None
 
     @classmethod
-    def login(cls, token: str):
+    def login(cls, username: str, token: str):
         if cls._server_ is not None:
             return
-        cls._server_ = JIRA(server=cls.URL, token_auth=token)
+        cls._server_ = JIRA(server=cls.URL, basic_auth=(username, token))
 
     @classmethod
     def logout(cls):
@@ -76,7 +80,23 @@ class Jira:
 
 
 if __name__ == '__main__':
-    # pylint: disable=protected-access
-    Jira.login(CONFIG.credentials.jira.token)
-    tracking = Jira.get_timetracking('DEV3-75')
-    Jira.logout()
+    import sys
+
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'list'
+
+    if mode == 'get':
+        Jira.login(*CONFIG.credentials.jira.values())
+        tracking = Jira.get_timetracking('DEV1-228')
+        print(tracking)
+        Jira.logout()
+
+    if mode == 'log':
+        Jira.login(*CONFIG.credentials.jira.values())
+        worklog = Jira.add_worklog(
+            'DEV1-228',
+            duration='5m',
+            started=datetime.now(),
+            comment='Test worklog entry',
+        )
+        print(worklog)
+        Jira.logout()
