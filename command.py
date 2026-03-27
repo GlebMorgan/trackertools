@@ -517,7 +517,7 @@ def log_work(entry: Entry) -> bool:
     return result
 
 
-@Command(Group.JIRA, ['log', 'all'])
+@Command(Group.JIRA, ['log'])
 def log_all():
     """Add worklog of all loaded entries to Jira"""
     logged = 0
