@@ -538,17 +538,17 @@ def log_all():
     print(summary)
 
 
-@Command(Group.RND, ['rnd', TimeList])
+@Command(Group.RND, ['target', TimeList])
 def get_rnd_times_manually(hours: List[timedelta | None]):
-    """Get RND hours for loaded work days manually"""
+    """Define target hours for daily work manually"""
     total_days = len(Table.group_by_days(Entry.all.values()))
     if len(hours) != total_days:
-        raise AppError(f"Expected {total_days} RND time intervals, got {len(hours)}")
+        raise AppError(f"Expected {total_days} time intervals, got {len(hours)}")
 
     Table.set_daily_targets(hours)
 
     durations = [timespan_to_duration(x) if x is not None else '-' for x in hours]
-    trace(f"Set RND hours for {total_days} days: [{', '.join(durations)}]")
+    trace(f"Set target hours for {total_days} days: [{', '.join(durations)}]")
 
 
 @Command(Group.CONFIG, ['scrollback', Toggle])
