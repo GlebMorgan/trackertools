@@ -12,6 +12,7 @@
     "/fleet/tms/libraries/extmcu-protobuf-communication": "ExtMCU-Proto",
     "/fleet/tms/tools/gitlab-roulette": "GitLab-Roulette",
     "/fleet/fmb/fmb-firmware": "FMB",
+    "/fleet/fmb/fmb-fmb6-eq-avl-ids": "AVLID",
     "/fleet/fmb6/fmb6-firmware": "FMB6",
     "/fleet/fmb/tetra-protocol": "TETRA",
     "/dotnet/confi/tct": "TCT",
